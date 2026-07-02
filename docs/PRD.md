@@ -1,149 +1,149 @@
 # PlanFlow AI PRD
 
-## Background
+## 背景
 
-PlanFlow AI is a learning planning assistant that turns a learning goal into an executable calendar plan. The first version focuses on helping users plan technical learning, such as "learn React in 30 hours", without becoming a broad Notion-style task manager.
+PlanFlow AI 是一个学习计划助手，用于把学习目标转成可执行的日历计划。第一版聚焦技术学习场景，例如“用 30 小时学习 React”，避免做成宽泛的 Notion 式任务管理工具。
 
-## Target Users
+## 目标用户
 
-- Frontend developers learning a new framework or stack.
-- Job seekers preparing structured learning plans.
-- Independent learners who have fragmented weekly availability.
+- 正在学习新框架或新技术栈的前端开发者。
+- 需要结构化学习计划的求职者。
+- 每周可学习时间不固定的独立学习者。
 
-## Core Pain Points
+## 核心痛点
 
-- Users know the learning goal but do not know how to split it into realistic tasks.
-- Users have uneven free time across the week, not the same time every day.
-- Generic todo apps do not decide when a task should happen.
-- Calendar reminders are useful, but third-party calendar integration can be heavy for a first release.
+- 用户知道学习目标，但不知道如何拆成可执行任务。
+- 用户每周空闲时间不均匀，并不是每天都有固定学习时间。
+- 普通 Todo 应用只记录任务，不负责决定任务应该什么时候发生。
+- 日历提醒很有价值，但第三方日历接入对第一版来说可能过重。
 
-## Product Positioning
+## 产品定位
 
-PlanFlow AI is not a generic todo app. It is an AI learning plan and calendar scheduling assistant.
+PlanFlow AI 不是通用任务管理工具，而是 AI 学习计划与日历排程助手。
 
-The product promise is:
+产品承诺：
 
-> Enter a learning goal and weekly availability. PlanFlow AI generates structured learning tasks and schedules them into a realistic calendar.
+> 输入学习目标和每周可用时间，PlanFlow AI 自动生成结构化学习任务，并排成真实可执行的学习日历。
 
-## MVP Features
+## MVP 功能
 
-### Learning Plan Creation
+### 创建学习计划
 
-Users can create a plan with:
+用户可以创建一个计划，包含：
 
-- Plan title
-- Learning goal description
-- Total learning hours
-- Start date
-- Deadline
-- Weekly availability rules
+- 计划标题
+- 学习目标描述
+- 总学习时长
+- 开始日期
+- 截止日期
+- 每周可用时间规则
 
-Acceptance criteria:
+验收标准：
 
-- User can create a plan from a form.
-- Total hours must be greater than 0.
-- Deadline must be after start date.
-- At least one weekly availability time range is required.
+- 用户可以通过表单创建计划。
+- 总时长必须大于 0。
+- 截止日期必须晚于开始日期。
+- 至少配置一个每周可用时间段。
 
-### Weekly Availability Configuration
+### 每周可用时间配置
 
-Users configure available learning time by weekday:
+用户按星期配置可学习时间：
 
-- Monday through Sunday can be enabled or disabled independently.
-- Each weekday supports zero or more time ranges.
-- Example: Saturday can include `09:00-12:00` and `14:00-16:00`.
+- 周一到周日可以分别启用或不启用。
+- 每个星期可以配置 0 个或多个时间段。
+- 示例：周六可以配置 `09:00-12:00` 和 `14:00-16:00`。
 
-Acceptance criteria:
+验收标准：
 
-- A weekday can have no availability.
-- A weekday can have multiple availability ranges.
-- Invalid ranges, such as end time before start time, are rejected.
-- Overlapping ranges on the same weekday are rejected.
+- 某一天可以没有可用时间。
+- 某一天可以有多个可用时间段。
+- 结束时间早于开始时间时需要拦截。
+- 同一天重叠的时间段需要拦截。
 
-### AI Task Decomposition
+### AI 任务拆解
 
-The system converts the learning goal into tasks.
+系统把学习目标转换成学习任务。
 
-Each task includes:
+每个任务包含：
 
-- Phase
-- Title
-- Description
-- Estimated minutes
-- Priority
-- Acceptance criteria
+- 学习阶段
+- 任务标题
+- 任务描述
+- 预计耗时
+- 优先级
+- 验收标准
 
-Acceptance criteria:
+验收标准：
 
-- AI output is parsed into structured tasks.
-- The sum of estimated minutes should approximate the requested total hours.
-- Invalid AI output is rejected with a user-friendly error.
-- The AI service is isolated from business route handlers.
+- AI 输出会被解析成结构化任务。
+- 任务总预计时长应接近用户填写的总学习时长。
+- 无效 AI 输出需要被拒绝，并给出可理解的错误提示。
+- AI 服务需要独立封装，不能散落在业务路由中。
 
-### Automatic Scheduling
+### 自动排程
 
-The scheduler places tasks into available weekly time ranges between start date and deadline.
+排程器把任务安排到开始日期和截止日期之间的可用时间段中。
 
-Acceptance criteria:
+验收标准：
 
-- Sessions are only generated inside user-configured availability.
-- Longer tasks can be split across multiple sessions.
-- Sessions include start time, end time, linked task, and status.
-- If available time is insufficient, unscheduled task time is reported clearly.
+- 日程只生成在用户配置的可用时间段内。
+- 长任务可以拆分到多个日程块。
+- 日程包含开始时间、结束时间、关联任务和状态。
+- 如果可用时间不足，需要清楚提示未排完的任务时长。
 
-### Calendar and Task Views
+### 日历和任务视图
 
-The UI shows:
+界面展示：
 
-- Plan overview
-- Today's learning sessions
-- Weekly calendar
-- Task list
-- Progress summary
+- 计划概览
+- 今日学习任务
+- 周日历
+- 任务列表
+- 进度汇总
 
-Acceptance criteria:
+验收标准：
 
-- User can see which sessions are scheduled on each date.
-- User can mark tasks or sessions as completed.
-- Progress updates after completion.
-- Empty, loading, and error states are visible.
+- 用户可以看到每个日期安排了哪些学习日程。
+- 用户可以把任务或日程标记为完成。
+- 完成后进度会更新。
+- 空状态、加载状态和错误状态需要可见。
 
-### Calendar Export
+### 日历导出
 
-Users can export scheduled sessions as an `.ics` file.
+用户可以把已排程日程导出为 `.ics` 文件。
 
-Acceptance criteria:
+验收标准：
 
-- Export includes all scheduled sessions.
-- Calendar event title includes the learning task title.
-- Event description includes plan name and acceptance criteria.
-- Export is available even without Feishu integration.
+- 导出内容包含所有已排程日程。
+- 日历事件标题包含学习任务标题。
+- 事件描述包含计划名称和验收标准。
+- 即使没有飞书集成，也可以使用导出能力。
 
-## Non-MVP Features
+## 非 MVP 功能
 
-- Real Feishu Calendar OAuth and event creation.
-- Multi-user teams.
-- Payments.
-- Advanced recommendation engine.
-- Mobile app.
-- Full RBAC.
-- Plugin system.
+- 真实飞书日历 OAuth 和事件创建。
+- 多用户团队协作。
+- 付费系统。
+- 高级推荐引擎。
+- 移动端 App。
+- 完整 RBAC 权限系统。
+- 插件系统。
 
-## User Flow
+## 用户流程
 
-1. User opens PlanFlow AI.
-2. User creates a learning plan.
-3. User configures weekly availability by weekday.
-4. User clicks generate plan.
-5. AI creates structured learning tasks.
-6. Scheduler creates calendar sessions.
-7. User reviews calendar and task list.
-8. User completes sessions and tracks progress.
-9. User exports `.ics` calendar file.
+1. 用户打开 PlanFlow AI。
+2. 用户创建学习计划。
+3. 用户按星期配置可用时间。
+4. 用户点击生成计划。
+5. AI 生成结构化学习任务。
+6. 排程器生成日历日程。
+7. 用户查看日历和任务列表。
+8. 用户完成日程并追踪进度。
+9. 用户导出 `.ics` 日历文件。
 
-## Success Metrics
+## 成功指标
 
-- User can generate a complete schedule in less than 3 minutes.
-- A 30-hour learning goal can be scheduled across uneven weekly availability.
-- The generated plan is understandable enough to explain in an interview demo.
-- The MVP remains usable if real AI or Feishu API is unavailable by using mock AI and `.ics` export.
+- 用户可以在 3 分钟内生成完整学习日历。
+- 一个 30 小时学习目标可以围绕不均匀的每周可用时间完成排程。
+- 生成结果足够清晰，可以用于面试演示。
+- 即使真实 AI 或飞书 API 不可用，MVP 也能通过模拟 AI 和 `.ics` 导出完整运行。

@@ -1,88 +1,88 @@
-# PlanFlow AI Design
+# PlanFlow AI 设计规格
 
-## Product Direction
+## 产品方向
 
-PlanFlow AI is an AI learning planning and calendar scheduling assistant. It helps users turn a natural language learning goal, such as "learn React", into structured learning tasks and scheduled calendar blocks.
+PlanFlow AI 是一个 AI 学习计划与日历排程助手。它帮助用户把自然语言学习目标，例如“学习 React”，转换成结构化学习任务，并安排到具体日历时间块中。
 
-The MVP targets individual learners, frontend developers switching stacks, and job seekers who need a realistic plan rather than another generic todo list.
+MVP 面向个人学习者、正在切换技术栈的前端开发者，以及需要现实学习计划的求职者，而不是再做一个通用 Todo 工具。
 
-## Core Problem
+## 核心问题
 
-Users often know what they want to learn and roughly how much time they can invest, but they do not know how to break the goal into executable tasks or how to fit those tasks into uneven weekly availability.
+用户通常知道自己想学什么，也大概知道能投入多少时间，但不知道如何把目标拆成可执行任务，也不知道如何把任务放进不均匀的每周可用时间里。
 
-PlanFlow AI solves this by combining:
+PlanFlow AI 通过以下能力解决这个问题：
 
-- AI task decomposition
-- Weekly availability rules
-- Deterministic scheduling
-- Calendar display and export
+- AI 任务拆解
+- 每周可用时间规则
+- 确定性排程
+- 日历展示与导出
 
-## MVP Scope
+## MVP 范围
 
-The MVP includes:
+MVP 包含：
 
-- Create a learning plan with title, goal description, total hours, start date, deadline, and weekly availability.
-- Configure availability by weekday. Each weekday can have zero or more time ranges.
-- Generate structured learning tasks with title, description, estimated minutes, priority, phase, and acceptance criteria.
-- Schedule tasks only inside available weekday time ranges.
-- Split longer tasks across multiple available slots when needed.
-- Display a plan overview, task list, today's tasks, and calendar schedule.
-- Track task status: not started, in progress, completed, and delayed.
-- Export scheduled sessions as an `.ics` calendar file.
+- 创建学习计划，包含标题、目标描述、总时长、开始日期、截止日期和每周可用时间。
+- 按星期配置可用时间。每个星期可以有 0 个或多个时间段。
+- 生成结构化学习任务，包含标题、描述、预计分钟数、优先级、阶段和验收标准。
+- 只把任务排入可用星期时间段。
+- 必要时把长任务拆分到多个可用时间段。
+- 展示计划概览、任务列表、今日任务和日历安排。
+- 追踪任务状态：未开始、进行中、已完成、已延期。
+- 导出 `.ics` 日历文件。
 
-The MVP does not require real Feishu Calendar synchronization. Feishu integration is documented as a later enhancement so third-party OAuth and app review do not block the first release.
+MVP 不要求真实飞书日历同步。飞书集成作为后续增强写入文档，避免第三方 OAuth 和应用审核阻塞第一版。
 
-## Recommended Architecture
+## 推荐架构
 
-Use a small full-stack TypeScript application:
+使用小型 TypeScript 全栈应用：
 
-- Frontend: React + TypeScript
-- Backend: Node + Express + TypeScript
-- Database: Prisma + SQLite
-- AI integration: isolated service that returns validated structured output
-- Scheduling: isolated pure module that can be unit tested
-- Calendar export: isolated `.ics` generator module
+- 前端：React + TypeScript
+- 后端：Node + Express + TypeScript
+- 数据库：Prisma + SQLite
+- AI 集成：独立服务，返回经过校验的结构化输出
+- 排程：独立纯函数模块，方便单元测试
+- 日历导出：独立 `.ics` 生成模块
 
-The key boundaries are:
+关键边界：
 
-- `aiPlanningService`: turns a learning goal into structured tasks.
-- `scheduler`: turns tasks and weekly availability into calendar sessions.
-- `calendarExportService`: turns sessions into an `.ics` file.
-- API layer: validates input and persists plans, tasks, availability, and sessions.
-- React UI: manages plan creation, availability editing, calendar display, and status updates.
+- `aiPlanningService`：把学习目标转换成结构化任务。
+- `scheduler`：把任务和每周可用时间转换成日历日程。
+- `calendarExportService`：把日程转换成 `.ics` 文件。
+- API 层：校验输入并持久化计划、任务、可用时间和日程。
+- React UI：管理计划创建、可用时间编辑、日历展示和状态更新。
 
-## Data Flow
+## 数据流
 
-1. User creates a learning plan and weekly availability rules.
-2. Backend validates the request and stores the plan draft.
-3. AI service generates structured learning tasks.
-4. Backend validates AI output and stores tasks.
-5. Scheduler reads tasks and weekly availability, then creates scheduled sessions before the deadline.
-6. Frontend displays the generated calendar and task list.
-7. User updates completion status.
-8. User exports an `.ics` file, or later syncs to Feishu Calendar.
+1. 用户创建学习计划和每周可用时间规则。
+2. 后端校验请求并保存计划草稿。
+3. AI 服务生成结构化学习任务。
+4. 后端校验 AI 输出并保存任务。
+5. 排程器读取任务和每周可用时间，在截止日期前生成日程。
+6. 前端展示生成的日历和任务列表。
+7. 用户更新完成状态。
+8. 用户导出 `.ics` 文件，后续也可以同步到飞书日历。
 
-## Error Handling
+## 错误处理
 
-- Invalid weekly availability returns validation errors before scheduling.
-- Overlapping time ranges on the same weekday are rejected.
-- Total available time before the deadline is compared with total task duration.
-- If capacity is insufficient, the scheduler returns a partial schedule plus unscheduled tasks.
-- AI output must be parsed and validated before persistence.
-- Calendar export must fail clearly if no scheduled sessions exist.
+- 每周可用时间非法时，在排程前返回校验错误。
+- 同一星期内重叠的时间段需要被拒绝。
+- 排程前比较截止日期前的总可用时间和任务总时长。
+- 如果容量不足，排程器返回部分日程和未排完任务。
+- AI 输出必须先解析和校验，再持久化。
+- 没有已排程日程时，日历导出需要清晰失败。
 
-## Testing Focus
+## 测试重点
 
-- Weekly availability validation.
-- Scheduling across uneven weekday slots.
-- Splitting tasks across multiple sessions.
-- Capacity shortage behavior.
-- AI output schema validation.
-- API request and response contracts.
-- Main frontend flow: create plan, generate tasks, view schedule, complete task, export calendar.
+- 每周可用时间校验。
+- 不均匀星期时间段下的排程。
+- 任务拆分到多个日程。
+- 可用时间不足处理。
+- AI 输出结构校验。
+- API 请求和响应契约。
+- 前端主流程：创建计划、生成任务、查看日程、完成任务、导出日历。
 
-## Open Decisions
+## 待确认决策
 
-- The first implementation can use a mock AI provider with the same response shape, then add real OpenAI integration behind the service boundary.
-- Authentication can be mocked or single-user for MVP.
-- Feishu Calendar should start as a documented adapter interface, with `.ics` export as the working MVP integration.
+- 第一版可以使用响应结构相同的模拟 AI 提供方，后续再在服务边界后接入真实 OpenAI。
+- 认证可以先使用模拟或单用户模式。
+- 飞书日历先设计成适配器接口，MVP 使用 `.ics` 导出作为可工作的日历集成。

@@ -1,57 +1,57 @@
 # AGENTS.md
 
-PlanFlow AI is currently a documentation-first TypeScript full-stack project. Application code has not been scaffolded yet.
+PlanFlow AI 当前是一个文档优先的 TypeScript 全栈项目。应用代码尚未创建。
 
-## Current Repository State
+## 当前仓库状态
 
-- Git is initialized.
-- Planning docs live in `docs/`.
-- The intended stack is documented as React + TypeScript, Node + Express + TypeScript, Prisma + SQLite.
-- No `package.json`, lockfile, build script, lint script, test runner, or source tree exists yet.
+- Git 已初始化。
+- 计划文档位于 `docs/`。
+- 计划技术栈为 React + TypeScript、Node + Express + TypeScript、Prisma + SQLite。
+- 当前还没有 `package.json`、锁文件、构建脚本、lint 脚本、测试脚本或源码目录。
 
-## Working Rules
+## 工作规则
 
-- Do not invent commands that are not present in repository configuration.
-- Before implementation, read:
+- 不要编造仓库配置里不存在的命令。
+- 开始实现前先阅读：
   - `docs/PRD.md`
   - `docs/TECH_DESIGN.md`
   - `docs/API_SPEC.md`
   - `docs/DATA_MODEL.md`
   - `docs/IMPLEMENTATION_PLAN.md`
   - `docs/TEST_PLAN.md`
-- Keep AI planning, scheduling, calendar export, API routes, and UI components separated by responsibility.
-- Treat `.ics` export as the MVP calendar integration.
-- Treat real Feishu Calendar sync as a future enhancement unless the user explicitly reprioritizes it.
+- AI 规划、排程算法、日历导出、API 路由和 UI 组件要按职责分离。
+- `.ics` 导出是 MVP 的日历集成能力。
+- 真实飞书日历同步是后续增强能力，除非用户明确重新调整优先级。
 
-## Commands
+## 命令
 
-No verified project commands exist yet. Add this section after scaffolding `package.json` and lockfiles.
+当前没有已验证的项目命令。创建 `package.json` 和锁文件后，再根据真实脚本补充本节。
 
-## Git Guidance
+## Git 指南
 
-- Keep commits small and stage-based.
-- Suggested commit boundaries:
-  - documentation/spec changes
-  - project scaffolding
-  - data model
-  - scheduler
-  - AI planning service
-  - backend API
-  - frontend flow
-  - verification and delivery docs
+- 保持小步提交，按阶段提交。
+- 建议提交边界：
+  - 文档和规格变更
+  - 项目脚手架
+  - 数据模型
+  - 排程算法
+  - AI 规划服务
+  - 后端 API
+  - 前端流程
+  - 验证和交付文档
 
-## Testing Guidance
+## 测试指南
 
-When implementation starts, prioritize tests for:
+开始实现后，优先覆盖：
 
-- Weekly availability validation
-- Scheduling across uneven weekday availability
-- Task splitting across sessions
-- Capacity shortage behavior
-- AI output validation
-- API contracts
-- Calendar export
+- 每周可用时间校验
+- 不均匀星期可用时间下的排程
+- 任务跨多个日程块拆分
+- 可用时间不足的处理
+- AI 输出校验
+- API 契约
+- 日历导出
 
-## Notes for Future Updates
+## 后续更新说明
 
-After scaffolding, update this file with factual commands copied from real scripts and config files.
+脚手架创建后，请用真实脚本和配置更新本文件，不要写猜测命令。

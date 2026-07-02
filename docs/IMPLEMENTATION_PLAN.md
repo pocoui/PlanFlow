@@ -1,193 +1,193 @@
-# PlanFlow AI Implementation Plan
+# PlanFlow AI 实施计划
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development if subagents are available, or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **给智能体执行者的要求：** 实施本计划时，如果可用，必须使用 superpowers:subagent-driven-development；否则使用 superpowers:executing-plans。步骤使用复选框（`- [ ]`）语法，便于追踪。
 
-**Goal:** Build a two-day MVP for PlanFlow AI: create a learning goal, configure weekly availability, generate AI-style tasks, schedule them into a calendar, and export `.ics`.
+**目标：** 构建 PlanFlow AI 两天 MVP：创建学习目标、配置每周可用时间、生成 AI 风格任务、排入日历并导出 `.ics`。
 
-**Architecture:** Keep the app modular even if the MVP is small. API routes stay thin; AI generation, scheduling, validation, and calendar export live in isolated modules with tests.
+**架构：** 即使 MVP 很小，也要保持模块化。API 路由保持轻薄；AI 生成、排程、校验和日历导出放在独立模块中，并配套测试。
 
-**Tech Stack:** React + TypeScript, Node + Express + TypeScript, Prisma + SQLite, Vitest, Supertest, `.ics` export.
+**技术栈：** React + TypeScript、Node + Express + TypeScript、Prisma + SQLite、Vitest、Supertest、`.ics` 导出。
 
 ---
 
-## Chunk 1: Project Foundation
+## 阶段 1：项目基础
 
-### Task 1: Scaffold TypeScript Web and API Apps
+### 任务 1：创建 TypeScript Web 和 API 应用骨架
 
-**Files:**
+**文件：**
 
-- Create root package and workspace configuration.
-- Create frontend app under `apps/web`.
-- Create backend app under `apps/api`.
-- Create shared package under `packages/shared`.
+- 创建根 package 和工作区配置。
+- 创建前端应用：`apps/web`。
+- 创建后端应用：`apps/api`。
+- 创建共享包：`packages/shared`。
 
-- [ ] Create package scripts for dev, build, test, lint, and typecheck.
-- [ ] Add TypeScript configs.
-- [ ] Add shared types package.
-- [ ] Run install.
-- [ ] Run typecheck.
-- [ ] Commit: `chore: scaffold typescript workspace`.
+- [ ] 创建 dev、build、test、lint、类型检查脚本。
+- [ ] 添加 TypeScript 配置。
+- [ ] 添加共享类型包。
+- [ ] 安装依赖。
+- [ ] 运行类型检查。
+- [ ] 提交：`chore: scaffold typescript workspace`。
 
-### Task 2: Add Prisma and Initial Schema
+### 任务 2：添加 Prisma 和初始 schema
 
-**Files:**
+**文件：**
 
-- Create `prisma/schema.prisma`.
-- Create API database client module.
+- 创建 `prisma/schema.prisma`。
+- 创建 API 数据库 client 模块。
 
-- [ ] Add schema from `docs/DATA_MODEL.md`.
-- [ ] Generate Prisma client.
-- [ ] Add seed or mock user strategy.
-- [ ] Run migration locally.
-- [ ] Commit: `feat: add prisma data model`.
+- [ ] 按 `docs/DATA_MODEL.md` 添加 schema。
+- [ ] 生成 Prisma 客户端。
+- [ ] 添加 seed 或模拟用户策略。
+- [ ] 本地运行 migration。
+- [ ] 提交：`feat: add prisma data model`。
 
-## Chunk 2: Core Domain Logic
+## 阶段 2：核心领域逻辑
 
-### Task 3: Availability Validation
+### 任务 3：可用时间校验
 
-**Files:**
+**文件：**
 
-- Create `packages/shared/src/availability.ts`.
-- Create tests for validation.
+- 创建 `packages/shared/src/availability.ts`。
+- 创建可用时间校验测试。
 
-- [ ] Write failing tests for valid weekday rules.
-- [ ] Write failing tests for overlapping ranges.
-- [ ] Write failing tests for invalid time order.
-- [ ] Implement validation.
-- [ ] Run tests.
-- [ ] Commit: `feat: validate weekly availability`.
+- [ ] 先写有效星期规则的失败测试。
+- [ ] 先写重叠时间段的失败测试。
+- [ ] 先写时间顺序非法的失败测试。
+- [ ] 实现校验逻辑。
+- [ ] 运行测试。
+- [ ] 提交：`feat: validate weekly availability`。
 
-### Task 4: Scheduler
+### 任务 4：排程算法
 
-**Files:**
+**文件：**
 
-- Create `packages/scheduler/src/scheduler.ts`.
-- Create scheduler tests.
+- 创建 `packages/scheduler/src/scheduler.ts`。
+- 创建排程测试。
 
-- [ ] Write failing test for scheduling inside weekday availability.
-- [ ] Write failing test for disabled weekdays.
-- [ ] Write failing test for multiple ranges on one day.
-- [ ] Write failing test for splitting long tasks.
-- [ ] Write failing test for insufficient capacity.
-- [ ] Implement deterministic earliest-slot scheduler.
-- [ ] Run tests.
-- [ ] Commit: `feat: schedule tasks by weekly availability`.
+- [ ] 先写“只排到星期可用时间内”的失败测试。
+- [ ] 先写“跳过禁用星期”的失败测试。
+- [ ] 先写“同一天多个时间段”的失败测试。
+- [ ] 先写“长任务拆分”的失败测试。
+- [ ] 先写“可用时间不足”的失败测试。
+- [ ] 实现确定性的最早可用时间排程器。
+- [ ] 运行测试。
+- [ ] 提交：`feat: schedule tasks by weekly availability`。
 
-### Task 5: AI Planning Service
+### 任务 5：AI 规划服务
 
-**Files:**
+**文件：**
 
-- Create `apps/api/src/services/aiPlanningService.ts`.
-- Create mock AI provider.
-- Create validation tests.
+- 创建 `apps/api/src/services/aiPlanningService.ts`。
+- 创建模拟 AI 提供方。
+- 创建输出校验测试。
 
-- [ ] Define input and output types.
-- [ ] Implement mock task generation for demo.
-- [ ] Validate generated tasks.
-- [ ] Add provider interface for real AI later.
-- [ ] Run tests.
-- [ ] Commit: `feat: add ai planning service boundary`.
+- [ ] 定义输入和输出类型。
+- [ ] 实现用于演示的模拟任务生成。
+- [ ] 校验生成任务。
+- [ ] 为后续真实 AI 添加提供方接口。
+- [ ] 运行测试。
+- [ ] 提交：`feat: add ai planning service boundary`。
 
-## Chunk 3: Backend API
+## 阶段 3：后端 API
 
-### Task 6: Plan APIs
+### 任务 6：计划 API
 
-**Files:**
+**文件：**
 
-- Create plan routes and services in `apps/api/src`.
-- Add Supertest coverage.
+- 在 `apps/api/src` 中创建计划 routes 和 services。
+- 添加 Supertest 覆盖。
 
-- [ ] Implement `POST /api/plans`.
-- [ ] Implement `POST /api/plans/:planId/generate`.
-- [ ] Implement `GET /api/plans/:planId`.
-- [ ] Persist plan, availability, tasks, and sessions.
-- [ ] Run API tests.
-- [ ] Commit: `feat: add plan generation api`.
+- [ ] 实现 `POST /api/plans`。
+- [ ] 实现 `POST /api/plans/:planId/generate`。
+- [ ] 实现 `GET /api/plans/:planId`。
+- [ ] 持久化计划、可用时间、任务和日程。
+- [ ] 运行 API 测试。
+- [ ] 提交：`feat: add plan generation api`。
 
-### Task 7: Status and Calendar Export APIs
+### 任务 7：状态更新和日历导出 API
 
-**Files:**
+**文件：**
 
-- Add task/session status routes.
-- Add calendar export service.
+- 添加任务和日程状态路由。
+- 添加日历导出服务。
 
-- [ ] Implement task status update.
-- [ ] Implement session status update.
-- [ ] Implement `.ics` export.
-- [ ] Test export with scheduled sessions.
-- [ ] Commit: `feat: add progress tracking and calendar export`.
+- [ ] 实现任务状态更新。
+- [ ] 实现日程状态更新。
+- [ ] 实现 `.ics` 导出。
+- [ ] 测试有日程时的导出结果。
+- [ ] 提交：`feat: add progress tracking and calendar export`。
 
-## Chunk 4: Frontend MVP
+## 阶段 4：前端 MVP
 
-### Task 8: Plan Creation and Availability UI
+### 任务 8：计划创建和可用时间 UI
 
-**Files:**
+**文件：**
 
-- Create React pages and components in `apps/web/src`.
+- 在 `apps/web/src` 中创建 React 页面和组件。
 
-- [ ] Build plan creation form.
-- [ ] Build weekday availability editor.
-- [ ] Add time range add/remove controls.
-- [ ] Show validation feedback.
-- [ ] Connect to create/generate API.
-- [ ] Commit: `feat: add plan creation flow`.
+- [ ] 构建计划创建表单。
+- [ ] 构建星期可用时间编辑器。
+- [ ] 添加时间段新增和删除控件。
+- [ ] 显示校验反馈。
+- [ ] 接入创建和生成 API。
+- [ ] 提交：`feat: add plan creation flow`。
 
-### Task 9: Plan Dashboard
+### 任务 9：计划看板
 
-**Files:**
+**文件：**
 
-- Create dashboard, calendar, task list, and summary components.
+- 创建看板、日历、任务列表和汇总组件。
 
-- [ ] Show plan summary.
-- [ ] Show today's sessions.
-- [ ] Show weekly calendar view.
-- [ ] Show task list and statuses.
-- [ ] Add complete action.
-- [ ] Add export calendar action.
-- [ ] Commit: `feat: add learning plan dashboard`.
+- [ ] 展示计划汇总。
+- [ ] 展示今日日程。
+- [ ] 展示周日历视图。
+- [ ] 展示任务列表和状态。
+- [ ] 添加完成操作。
+- [ ] 添加日历导出操作。
+- [ ] 提交：`feat: add learning plan dashboard`。
 
-## Chunk 5: Verification and Delivery
+## 阶段 5：验证和交付
 
-### Task 10: End-to-End Demo Verification
+### 任务 10：端到端演示验证
 
-- [ ] Run all tests.
-- [ ] Run typecheck.
-- [ ] Run build.
-- [ ] Start dev server.
-- [ ] Verify desktop flow in browser.
-- [ ] Verify mobile layout in browser.
-- [ ] Fix visible layout issues.
-- [ ] Commit: `test: verify mvp flow`.
+- [ ] 运行全部测试。
+- [ ] 运行类型检查。
+- [ ] 运行构建。
+- [ ] 启动开发服务。
+- [ ] 用浏览器验证桌面端流程。
+- [ ] 用浏览器验证移动端布局。
+- [ ] 修复可见布局问题。
+- [ ] 提交：`test: verify mvp flow`。
 
-### Task 11: Delivery Docs
+### 任务 11：交付文档
 
-**Files:**
+**文件：**
 
-- Update `README.md`.
-- Create deployment notes if needed.
-- Create interview notes if needed.
+- 更新 `README.md`。
+- 如有需要，创建部署说明。
+- 如有需要，创建面试讲解说明。
 
-- [ ] Document setup commands.
-- [ ] Document demo script.
-- [ ] Document architecture.
-- [ ] Document future Feishu integration.
-- [ ] Commit: `docs: add delivery guide`.
+- [ ] 记录安装和启动命令。
+- [ ] 记录演示脚本。
+- [ ] 记录架构说明。
+- [ ] 记录后续飞书集成方案。
+- [ ] 提交：`docs: add delivery guide`。
 
-## Two-Day Execution Order
+## 两天执行顺序
 
-Day 1:
+第一天：
 
-- Scaffold workspace.
-- Add data model.
-- Implement availability validation.
-- Implement scheduler.
-- Implement mock AI service.
-- Add core API.
+- 创建工作区。
+- 添加数据模型。
+- 实现可用时间校验。
+- 实现排程算法。
+- 实现模拟 AI 服务。
+- 添加核心 API。
 
-Day 2:
+第二天：
 
-- Build frontend creation flow.
-- Build dashboard and calendar view.
-- Add `.ics` export.
-- Run verification.
-- Polish README and interview explanation.
+- 构建前端创建流程。
+- 构建看板和日历视图。
+- 添加 `.ics` 导出。
+- 运行验证。
+- 打磨 README 和面试说明。

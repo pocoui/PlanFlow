@@ -1,12 +1,12 @@
-# PlanFlow AI Data Model
+# PlanFlow AI 数据模型
 
-## Entities
+## 实体
 
 ## User
 
-MVP can use a single mock user. Keep the model future-friendly.
+MVP 可以使用单个 mock 用户，但模型保留后续扩展空间。
 
-Fields:
+字段：
 
 - `id`
 - `email`
@@ -16,9 +16,9 @@ Fields:
 
 ## LearningPlan
 
-Represents one learning goal and generated plan.
+表示一个学习目标和它生成后的计划。
 
-Fields:
+字段：
 
 - `id`
 - `userId`
@@ -27,42 +27,42 @@ Fields:
 - `totalMinutes`
 - `startDate`
 - `deadline`
-- `status`: `draft`, `generated`, `archived`
+- `status`：`draft`、`generated`、`archived`
 - `createdAt`
 - `updatedAt`
 
-Relations:
+关系：
 
-- Has many `AvailabilityRule`
-- Has many `LearningTask`
-- Has many `ScheduledSession`
+- 拥有多个 `AvailabilityRule`
+- 拥有多个 `LearningTask`
+- 拥有多个 `ScheduledSession`
 
 ## AvailabilityRule
 
-Represents a weekly available time range.
+表示一个每周重复的可用时间段。
 
-Fields:
+字段：
 
 - `id`
 - `planId`
-- `weekday`: `0` Sunday through `6` Saturday
-- `startTime`: `HH:mm`
-- `endTime`: `HH:mm`
+- `weekday`：`0` 表示周日，`6` 表示周六
+- `startTime`：`HH:mm`
+- `endTime`：`HH:mm`
 - `createdAt`
 - `updatedAt`
 
-Rules:
+规则：
 
-- A plan can have zero or more rules per weekday.
-- MVP requires at least one rule across the whole week.
-- Rules on the same weekday cannot overlap.
-- `endTime` must be later than `startTime`.
+- 一个计划在每个星期可以有 0 个或多个规则。
+- MVP 要求整个星期至少有一个可用时间段。
+- 同一星期内的规则不能重叠。
+- `endTime` 必须晚于 `startTime`。
 
 ## LearningTask
 
-Represents an AI-generated learning task.
+表示 AI 生成的学习任务。
 
-Fields:
+字段：
 
 - `id`
 - `planId`
@@ -71,17 +71,17 @@ Fields:
 - `description`
 - `estimatedMinutes`
 - `priority`
-- `status`: `not_started`, `in_progress`, `completed`, `delayed`
-- `acceptanceCriteria`: JSON array of strings
+- `status`：`not_started`、`in_progress`、`completed`、`delayed`
+- `acceptanceCriteria`：字符串数组，使用 JSON 存储
 - `orderIndex`
 - `createdAt`
 - `updatedAt`
 
 ## ScheduledSession
 
-Represents one concrete calendar block.
+表示一个具体日历时间块。
 
-Fields:
+字段：
 
 - `id`
 - `planId`
@@ -89,17 +89,17 @@ Fields:
 - `startAt`
 - `endAt`
 - `durationMinutes`
-- `status`: `scheduled`, `completed`, `missed`, `rescheduled`
+- `status`：`scheduled`、`completed`、`missed`、`rescheduled`
 - `createdAt`
 - `updatedAt`
 
-Rules:
+规则：
 
-- A task can have multiple sessions.
-- Sessions must be inside the plan date range.
-- Sessions must be inside matching weekly availability.
+- 一个任务可以对应多个日程。
+- 日程必须位于计划日期范围内。
+- 日程必须位于匹配的每周可用时间段内。
 
-## Suggested Prisma Schema
+## 建议 Prisma Schema
 
 ```prisma
 model User {

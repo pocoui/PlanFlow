@@ -1,40 +1,40 @@
 # PlanFlow AI
 
-PlanFlow AI is an AI learning plan and calendar scheduling assistant. Users enter a learning goal, configure weekly availability, generate structured learning tasks, and schedule those tasks into realistic calendar sessions.
+PlanFlow AI 是一个 AI 学习计划与日历排程助手。用户输入学习目标，配置每周可学习时间，系统生成结构化学习任务，并把任务安排到真实可执行的日历时间段里。
 
-## MVP Direction
+## MVP 方向
 
-The first version focuses on:
+第一版重点实现：
 
-- Learning goal creation
-- Weekday-based availability rules
-- AI-style task decomposition
-- Deterministic scheduling
-- Calendar dashboard
-- `.ics` calendar export
+- 创建学习目标
+- 按星期配置可用时间规则
+- AI 风格的任务拆解
+- 确定性的排程算法
+- 日历看板
+- `.ics` 日历导出
 
-Real Feishu Calendar sync is a later enhancement. The MVP should remain useful and demonstrable with `.ics` export.
+真实飞书日历同步是后续增强能力。MVP 需要在只有 `.ics` 导出的情况下依然可以完整演示。
 
-## Planned Stack
+## 计划技术栈
 
 - React + TypeScript
 - Node + Express + TypeScript
 - Prisma + SQLite
-- Vitest and Supertest
+- Vitest 和 Supertest
 
-## Current Status
+## 当前状态
 
-The project is in the documentation and planning phase. No application code has been scaffolded yet.
+项目目前处于文档和计划阶段，尚未创建应用代码。
 
-## Documentation
+## 文档
 
 - [PRD](docs/PRD.md)
-- [Technical Design](docs/TECH_DESIGN.md)
-- [API Spec](docs/API_SPEC.md)
-- [Data Model](docs/DATA_MODEL.md)
-- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
-- [Test Plan](docs/TEST_PLAN.md)
+- [技术设计](docs/TECH_DESIGN.md)
+- [API 规格](docs/API_SPEC.md)
+- [数据模型](docs/DATA_MODEL.md)
+- [实施计划](docs/IMPLEMENTATION_PLAN.md)
+- [测试计划](docs/TEST_PLAN.md)
 
-## Interview Positioning
+## 面试定位
 
-PlanFlow AI is not a generic todo app. It demonstrates how to turn a natural language learning goal into structured tasks, schedule those tasks around uneven weekly availability, and export the result into a real calendar workflow.
+PlanFlow AI 不是普通 Todo 应用。它展示的是：如何把自然语言学习目标转成结构化任务，如何围绕不均匀的每周可用时间做排程，以及如何把结果导出到真实日历工作流。

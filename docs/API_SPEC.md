@@ -1,17 +1,17 @@
-# PlanFlow AI API Spec
+# PlanFlow AI API 规格
 
-Base path: `/api`
+基础路径：`/api`
 
-## Create Plan
+## 创建计划
 
 `POST /plans`
 
-Request:
+请求：
 
 ```json
 {
-  "title": "Learn React",
-  "goal": "Learn React fundamentals, hooks, routing, and build a small project.",
+  "title": "学习 React",
+  "goal": "学习 React 基础、Hooks、路由，并完成一个小项目。",
   "totalMinutes": 1800,
   "startDate": "2026-07-03",
   "deadline": "2026-07-20",
@@ -24,30 +24,30 @@ Request:
 }
 ```
 
-Response:
+响应：
 
 ```json
 {
   "id": "plan_123",
-  "title": "Learn React",
+  "title": "学习 React",
   "status": "draft",
   "createdAt": "2026-07-03T00:00:00.000Z"
 }
 ```
 
-Validation:
+校验规则：
 
-- `totalMinutes` must be positive.
-- `deadline` must be after `startDate`.
-- `availability` must contain at least one valid time range.
-- `weekday` uses `0` for Sunday through `6` for Saturday.
-- Time ranges on the same weekday must not overlap.
+- `totalMinutes` 必须为正数。
+- `deadline` 必须晚于 `startDate`。
+- `availability` 至少包含一个有效时间段。
+- `weekday` 使用 `0` 表示周日，`6` 表示周六。
+- 同一星期内的时间段不能重叠。
 
-## Generate Plan
+## 生成计划
 
 `POST /plans/:planId/generate`
 
-Response:
+响应：
 
 ```json
 {
@@ -55,11 +55,11 @@ Response:
   "tasks": [
     {
       "id": "task_1",
-      "phase": "Foundation",
-      "title": "React component basics",
+      "phase": "基础阶段",
+      "title": "React 组件基础",
       "estimatedMinutes": 180,
       "priority": 1,
-      "acceptanceCriteria": ["Can explain JSX", "Can build a reusable component"]
+      "acceptanceCriteria": ["可以解释 JSX", "可以构建可复用组件"]
     }
   ],
   "sessions": [
@@ -75,29 +75,29 @@ Response:
 }
 ```
 
-Possible warnings:
+可能的警告：
 
 - `INSUFFICIENT_CAPACITY`
 - `AI_ESTIMATE_ADJUSTED`
 - `PARTIAL_TASK_SCHEDULED`
 
-## Get Plan Detail
+## 获取计划详情
 
 `GET /plans/:planId`
 
-Response includes:
+响应包含：
 
-- Plan metadata
-- Weekly availability
-- Tasks
-- Sessions
-- Progress summary
+- 计划元信息
+- 每周可用时间
+- 任务列表
+- 日程列表
+- 进度汇总
 
-## Update Task Status
+## 更新任务状态
 
 `PATCH /tasks/:taskId/status`
 
-Request:
+请求：
 
 ```json
 {
@@ -105,18 +105,18 @@ Request:
 }
 ```
 
-Allowed statuses:
+允许的状态：
 
 - `not_started`
 - `in_progress`
 - `completed`
 - `delayed`
 
-## Update Session Status
+## 更新日程状态
 
 `PATCH /sessions/:sessionId/status`
 
-Request:
+请求：
 
 ```json
 {
@@ -124,34 +124,34 @@ Request:
 }
 ```
 
-Allowed statuses:
+允许的状态：
 
 - `scheduled`
 - `completed`
 - `missed`
 - `rescheduled`
 
-## Export Calendar
+## 导出日历
 
 `GET /plans/:planId/calendar.ics`
 
-Response:
+响应：
 
-- Content-Type: `text/calendar`
-- Body: `.ics` calendar content
+- Content-Type：`text/calendar`
+- 响应体：`.ics` 日历内容
 
-Errors:
+错误：
 
-- `404` if plan does not exist.
-- `409` if plan has no scheduled sessions.
+- 计划不存在时返回 `404`。
+- 计划没有已排程日程时返回 `409`。
 
-## Error Shape
+## 错误结构
 
 ```json
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Availability ranges overlap on Saturday.",
+    "message": "周六的可用时间段存在重叠。",
     "details": {}
   }
 }

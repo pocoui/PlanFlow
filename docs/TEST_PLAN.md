@@ -1,122 +1,122 @@
-# PlanFlow AI Test Plan
+# PlanFlow AI 测试计划
 
-## Test Strategy
+## 测试策略
 
-Focus tests on the parts that make the project more than a todo app:
+测试重点放在让项目区别于普通 Todo 的部分：
 
-- Weekly availability validation
-- Scheduling algorithm
-- AI output validation
-- API contracts
-- Main frontend flow
-- Calendar export
+- 每周可用时间校验
+- 排程算法
+- AI 输出校验
+- API 契约
+- 前端主流程
+- 日历导出
 
-## Unit Tests
+## 单元测试
 
-### Availability Validation
+### 可用时间校验
 
-Cases:
+用例：
 
-- Accepts one valid weekday range.
-- Accepts multiple non-overlapping ranges on the same weekday.
-- Accepts weekdays with no ranges.
-- Rejects end time earlier than start time.
-- Rejects equal start and end time.
-- Rejects overlapping ranges.
-- Rejects invalid weekday values.
+- 接受一个有效星期时间段。
+- 接受同一天多个不重叠时间段。
+- 接受某些星期没有时间段。
+- 拒绝结束时间早于开始时间。
+- 拒绝开始时间等于结束时间。
+- 拒绝重叠时间段。
+- 拒绝非法星期值。
 
-### Scheduler
+### 排程器
 
-Cases:
+用例：
 
-- Schedules tasks only inside configured availability.
-- Skips disabled weekdays.
-- Uses multiple ranges on a weekday.
-- Splits long tasks across sessions.
-- Schedules earlier available slots first.
-- Returns unscheduled minutes when capacity is insufficient.
-- Produces deterministic output for the same input.
+- 任务只排入配置好的可用时间。
+- 跳过禁用星期。
+- 使用同一天的多个时间段。
+- 把长任务拆分到多个日程。
+- 优先使用更早的可用时间段。
+- 可用时间不足时返回未排完分钟数。
+- 相同输入产生确定性输出。
 
-### AI Output Validation
+### AI 输出校验
 
-Cases:
+用例：
 
-- Accepts valid generated tasks.
-- Rejects missing title.
-- Rejects non-positive estimated minutes.
-- Rejects empty acceptance criteria.
-- Warns if total generated minutes differs too much from target.
+- 接受有效生成任务。
+- 拒绝缺少标题的任务。
+- 拒绝预计分钟数非正数的任务。
+- 拒绝空验收标准。
+- 当生成总分钟数和目标偏差过大时给出警告。
 
-### Calendar Export
+### 日历导出
 
-Cases:
+用例：
 
-- Generates valid `.ics` content for sessions.
-- Includes task title in event summary.
-- Includes plan title and acceptance criteria in event description.
-- Fails clearly when no sessions exist.
+- 为日程生成有效 `.ics` 内容。
+- 事件 `summary` 字段包含任务标题。
+- 事件 `description` 字段包含计划标题和验收标准。
+- 没有日程时清晰失败。
 
-## API Tests
+## API 测试
 
 ### `POST /api/plans`
 
-Cases:
+用例：
 
-- Creates a plan with valid availability.
-- Rejects invalid deadline.
-- Rejects empty availability.
-- Rejects overlapping ranges.
+- 使用有效可用时间创建计划。
+- 拒绝非法截止日期。
+- 拒绝空可用时间。
+- 拒绝重叠时间段。
 
 ### `POST /api/plans/:planId/generate`
 
-Cases:
+用例：
 
-- Generates tasks and sessions.
-- Returns warnings when capacity is insufficient.
-- Returns 404 for missing plan.
+- 生成任务和日程。
+- 可用时间不足时返回警告。
+- 计划不存在时返回 404。
 
 ### `GET /api/plans/:planId`
 
-Cases:
+用例：
 
-- Returns plan detail with tasks, sessions, availability, and progress.
-- Returns 404 for missing plan.
+- 返回计划详情，包含任务、日程、可用时间和进度。
+- 计划不存在时返回 404。
 
-### Status Updates
+### 状态更新
 
-Cases:
+用例：
 
-- Updates task status.
-- Updates session status.
-- Rejects invalid status.
+- 更新任务状态。
+- 更新日程状态。
+- 拒绝非法状态。
 
-### Calendar Export
+### 日历导出
 
-Cases:
+用例：
 
-- Returns `text/calendar`.
-- Returns 409 when plan has no sessions.
+- 返回 `text/calendar`。
+- 计划没有日程时返回 409。
 
-## Frontend Verification
+## 前端验证
 
-Manual browser checks:
+手动浏览器检查：
 
-- Plan creation happy path.
-- Weekly availability add and remove.
-- Validation errors for bad time ranges.
-- Generated plan loading state.
-- Generated plan error state.
-- Calendar view on desktop.
-- Calendar view on mobile.
-- Mark session completed.
-- Export `.ics`.
+- 计划创建正常流程。
+- 每周可用时间新增和删除。
+- 错误时间段的校验提示。
+- 生成计划加载状态。
+- 生成计划错误状态。
+- 桌面端日历视图。
+- 移动端日历视图。
+- 标记日程完成。
+- 导出 `.ics`。
 
-## Build Verification
+## 构建验证
 
-Before claiming a stage complete:
+每个阶段声称完成前：
 
-- Run all unit tests.
-- Run API tests.
-- Run typecheck.
-- Run production build.
-- Check Git status.
+- 运行全部单元测试。
+- 运行 API 测试。
+- 运行类型检查。
+- 运行生产构建。
+- 检查 Git 状态。
