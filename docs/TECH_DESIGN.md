@@ -2,10 +2,12 @@
 
 ## 技术栈
 
-- 前端：React + TypeScript + Vite
-- 后端：Node.js + Express + TypeScript
-- 数据库：Prisma + SQLite
-- 测试：核心逻辑和前端单元测试使用 Vitest，API 测试使用 Supertest
+- 全栈框架：Next.js App Router + React + TypeScript
+- API 层：Next.js Route Handlers
+- 数据库：Prisma + PostgreSQL
+- UI：Tailwind CSS + shadcn/ui
+- 校验：Zod
+- 测试：核心逻辑使用 Vitest，主流程使用 Playwright
 - 日历导出：根据已排程日程生成 `.ics`
 - AI 提供方：先使用模拟提供方，后续接入兼容 OpenAI 的提供方
 
@@ -14,11 +16,12 @@
 计划结构：
 
 ```text
-apps/
-  web/
-    src/
+app/
   api/
-    src/
+  plans/
+  dashboard/
+components/
+lib/
 packages/
   shared/
     src/
@@ -28,7 +31,7 @@ docs/
 prisma/
 ```
 
-两天 MVP 可以实现为一个 TypeScript 工作区。重点不是目录复杂度，而是保持 UI、API、AI 规划、排程算法和共享类型之间的职责边界。
+三天 MVP 使用完整 Next.js App Router 项目结构。重点不是把前后端拆成两个服务，而是在一个 Next.js 全栈应用中保持页面、API、AI 规划、排程算法和共享类型之间的职责边界。
 
 ## 前端架构
 
@@ -65,7 +68,7 @@ MVP 阶段保持状态管理简单：
 - `scheduler`：根据任务和可用时间创建日程。
 - `calendar`：导出 `.ics`。
 
-Express 路由保持轻薄，业务逻辑放在 service 中。
+Route Handlers 保持轻薄，业务逻辑放在 service 中。第一版不额外引入 Express 或 NestJS，避免增加跨服务联调、CORS 和部署复杂度；后续业务复杂度上升时，可以把 `lib/services` 中的逻辑迁移到独立 Node/NestJS 服务。
 
 ## AI 设计
 
@@ -129,8 +132,8 @@ MVP：
 MVP 部署选项：
 
 - 前端：Vercel 或静态托管。
-- 后端：Render、Railway 或轻量 Node 服务。
-- 数据库：本地演示用 SQLite；正式持久化部署后可迁移到 PostgreSQL。
+- 应用：优先部署到 Vercel。
+- 数据库：本地和线上都以 PostgreSQL 为目标；本地可使用 Docker PostgreSQL 或托管 PostgreSQL 开发库。
 
 环境变量：
 

@@ -37,8 +37,11 @@ MVP 不要求真实飞书日历同步。飞书集成作为后续增强写入文�
 使用小型 TypeScript 全栈应用：
 
 - 前端：React + TypeScript
-- 后端：Node + Express + TypeScript
-- 数据库：Prisma + SQLite
+- 全栈框架：Next.js App Router + React + TypeScript
+- API 层：Next.js Route Handlers
+- 数据库：Prisma + PostgreSQL
+- UI：Tailwind CSS + shadcn/ui
+- 校验：Zod
 - AI 集成：独立服务，返回经过校验的结构化输出
 - 排程：独立纯函数模块，方便单元测试
 - 日历导出：独立 `.ics` 生成模块

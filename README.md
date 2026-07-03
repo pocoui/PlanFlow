@@ -17,10 +17,12 @@ PlanFlow AI 是一个 AI 学习计划与日历排程助手。用户输入学习�
 
 ## 计划技术栈
 
-- React + TypeScript
-- Node + Express + TypeScript
-- Prisma + SQLite
-- Vitest 和 Supertest
+- Next.js App Router + React + TypeScript
+- Next.js Route Handlers
+- Prisma + PostgreSQL
+- Tailwind CSS + shadcn/ui
+- Zod
+- Vitest 和 Playwright
 
 ## 当前状态
 

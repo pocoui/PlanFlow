@@ -6,7 +6,7 @@ PlanFlow AI 当前是一个文档优先的 TypeScript 全栈项目。应用代�
 
 - Git 已初始化。
 - 计划文档位于 `docs/`。
-- 计划技术栈为 React + TypeScript、Node + Express + TypeScript、Prisma + SQLite。
+- 计划技术栈为 Next.js App Router + React + TypeScript、Route Handlers、Prisma + PostgreSQL、Tailwind CSS + shadcn/ui、Zod、Vitest 和 Playwright。
 - 当前还没有 `package.json`、锁文件、构建脚本、lint 脚本、测试脚本或源码目录。
 
 ## 工作规则

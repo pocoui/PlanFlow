@@ -2,23 +2,23 @@
 
 > **给智能体执行者的要求：** 实施本计划时，如果可用，必须使用 superpowers:subagent-driven-development；否则使用 superpowers:executing-plans。步骤使用复选框（`- [ ]`）语法，便于追踪。
 
-**目标：** 构建 PlanFlow AI 两天 MVP：创建学习目标、配置每周可用时间、生成 AI 风格任务、排入日历并导出 `.ics`。
+**目标：** 构建 PlanFlow AI 三天 MVP：创建学习目标、配置每周可用时间、生成 AI 风格任务、排入日历并导出 `.ics`。
 
 **架构：** 即使 MVP 很小，也要保持模块化。API 路由保持轻薄；AI 生成、排程、校验和日历导出放在独立模块中，并配套测试。
 
-**技术栈：** React + TypeScript、Node + Express + TypeScript、Prisma + SQLite、Vitest、Supertest、`.ics` 导出。
+**技术栈：** Next.js App Router + React + TypeScript、Route Handlers、Prisma + PostgreSQL、Tailwind CSS + shadcn/ui、Zod、Vitest、Playwright、`.ics` 导出。
 
 ---
 
 ## 阶段 1：项目基础
 
-### 任务 1：创建 TypeScript Web 和 API 应用骨架
+### 任务 1：创建 Next.js 全栈应用骨架
 
 **文件：**
 
 - 创建根 package 和工作区配置。
-- 创建前端应用：`apps/web`。
-- 创建后端应用：`apps/api`。
+- 创建 Next.js App Router 应用。
+- 创建 `app/`、`components/`、`lib/`、`packages/` 和 `prisma/` 基础目录。
 - 创建共享包：`packages/shared`。
 
 - [ ] 创建 dev、build、test、lint、类型检查脚本。
@@ -77,7 +77,7 @@
 
 **文件：**
 
-- 创建 `apps/api/src/services/aiPlanningService.ts`。
+- 创建 `lib/services/aiPlanningService.ts`。
 - 创建模拟 AI 提供方。
 - 创建输出校验测试。
 
@@ -94,8 +94,8 @@
 
 **文件：**
 
-- 在 `apps/api/src` 中创建计划 routes 和 services。
-- 添加 Supertest 覆盖。
+- 在 `app/api` 中创建计划 Route Handlers，在 `lib/services` 中创建业务 services。
+- 添加 Route Handler 和 service 测试。
 
 - [ ] 实现 `POST /api/plans`。
 - [ ] 实现 `POST /api/plans/:planId/generate`。
@@ -123,7 +123,7 @@
 
 **文件：**
 
-- 在 `apps/web/src` 中创建 React 页面和组件。
+- 在 `app/` 和 `components/` 中创建 Next.js 页面和 React 组件。
 
 - [ ] 构建计划创建表单。
 - [ ] 构建星期可用时间编辑器。
@@ -173,21 +173,24 @@
 - [ ] 记录后续飞书集成方案。
 - [ ] 提交：`docs: add delivery guide`。
 
-## 两天执行顺序
+## 三天执行顺序
 
 第一天：
 
-- 创建工作区。
+- 创建 Next.js 应用骨架。
 - 添加数据模型。
 - 实现可用时间校验。
 - 实现排程算法。
-- 实现模拟 AI 服务。
-- 添加核心 API。
 
 第二天：
 
+- 实现模拟 AI 服务。
+- 添加核心 Route Handlers。
+- 添加 `.ics` 导出。
+
+第三天：
+
 - 构建前端创建流程。
 - 构建看板和日历视图。
-- 添加 `.ics` 导出。
 - 运行验证。
 - 打磨 README 和面试说明。
