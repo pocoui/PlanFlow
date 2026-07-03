@@ -28,7 +28,49 @@ PlanFlow AI 是一个 AI 学习计划与日历排程助手。用户输入学习�
 
 ## 当前状态
 
-项目目前处于文档和计划阶段，尚未创建应用代码。
+项目已完成第一阶段的基础脚手架：
+
+- Next.js App Router 项目结构
+- Route Handlers 基础 API 目录
+- `packages/shared` 和 `packages/scheduler` 工作区占位
+- Tailwind CSS、TypeScript、ESLint、Vitest 和 Playwright 配置
+- 环境变量示例
+
+当前还没有实现 Prisma schema、业务 API、AI 规划、排程算法或前端业务流程。
+
+## 本地启动
+
+安装依赖：
+
+```bash
+npm install
+```
+
+复制环境变量示例：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+启动开发服务：
+
+```bash
+npm run dev
+```
+
+默认访问：
+
+- Web 页面：`http://localhost:3000`
+- 健康检查：`http://localhost:3000/api/health`
+
+## 常用命令
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
 
 ## 文档
 

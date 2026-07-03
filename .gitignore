@@ -4,6 +4,7 @@ build/
 .next/
 .vite/
 coverage/
+tsconfig.tsbuildinfo
 
 .env
 .env.*

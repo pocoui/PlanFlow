@@ -1,13 +1,14 @@
 # AGENTS.md
 
-PlanFlow AI 当前是一个文档优先的 TypeScript 全栈项目。应用代码尚未创建。
+PlanFlow AI 当前是一个 Next.js App Router + TypeScript 全栈项目。第一阶段脚手架已创建，复杂业务尚未实现。
 
 ## 当前仓库状态
 
 - Git 已初始化。
 - 计划文档位于 `docs/`。
 - 计划技术栈为 Next.js App Router + React + TypeScript、Route Handlers、Prisma + PostgreSQL、Tailwind CSS + shadcn/ui、Zod、Vitest 和 Playwright。
-- 当前还没有 `package.json`、锁文件、构建脚本、lint 脚本、测试脚本或源码目录。
+- 已创建 `package.json`、基础配置、`app/`、`components/`、`lib/`、`packages/`、`prisma/` 和 `test/`。
+- 当前还没有 Prisma schema、业务 API、AI 规划服务、排程算法或业务 UI。
 
 ## 工作规则
 
@@ -25,7 +26,26 @@ PlanFlow AI 当前是一个文档优先的 TypeScript 全栈项目。应用代�
 
 ## 命令
 
-当前没有已验证的项目命令。创建 `package.json` 和锁文件后，再根据真实脚本补充本节。
+安装依赖：
+
+```bash
+npm install
+```
+
+启动开发服务：
+
+```bash
+npm run dev
+```
+
+质量检查：
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
 
 ## Git 指南
 
