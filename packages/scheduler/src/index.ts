@@ -1,3 +1,1 @@
-export interface SchedulerPlaceholder {
-  readonly readyForDomainImplementation: true;
-}
+export * from "./scheduler";
