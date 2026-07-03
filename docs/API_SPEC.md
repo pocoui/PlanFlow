@@ -15,6 +15,7 @@
   "totalMinutes": 1800,
   "startDate": "2026-07-03",
   "deadline": "2026-07-20",
+  "rescheduleBufferMinutes": 15,
   "availability": [
     { "weekday": 1, "startTime": "20:00", "endTime": "22:00" },
     { "weekday": 3, "startTime": "19:30", "endTime": "21:30" },
@@ -39,6 +40,7 @@
 
 - `totalMinutes` 必须为正数。
 - `deadline` 必须晚于 `startDate`。
+- `rescheduleBufferMinutes` 默认为 `15`，必须大于等于 `0`。
 - `availability` 至少包含一个有效时间段。
 - `weekday` 使用 `0` 表示周日，`6` 表示周六。
 - 同一星期内的时间段不能重叠。
@@ -188,6 +190,7 @@
 
 - `partial`、`not_completed`、`skipped` 会触发顺延。
 - 顺延只使用当前时间之后的真实可用时间。
+- 顺延时需要应用计划的 `rescheduleBufferMinutes`。
 - 如果截止日期前容量不足，返回 `INSUFFICIENT_CAPACITY` 警告。
 
 ## 获取忙碌时间

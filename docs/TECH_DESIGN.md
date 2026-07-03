@@ -99,6 +99,7 @@ generateLearningTasks(input: GenerateLearningTasksInput): Promise<GeneratedTask[
 - 扣除外部忙碌时间后的真实可用时间。
 - 开始日期。
 - 截止日期。
+- 冲突后缓冲时间，单位为分钟。
 
 排程器输出：
 
@@ -110,6 +111,7 @@ generateLearningTasks(input: GenerateLearningTasksInput): Promise<GeneratedTask[
 
 - 永远不排到可用时间之外。
 - 永远不与飞书忙碌时间冲突。
+- 当学习任务因忙碌时间冲突而顺延时，新日程开始时间必须晚于忙碌时间结束时间加缓冲时间。
 - 尊重未启用的星期。
 - 支持同一天多个时间段。
 - 当任务时长超过单个时间段时，允许拆成多个日程。
@@ -133,6 +135,7 @@ MVP：
 - 实现 `MockFeishuCalendarProvider`，模拟会议和忙碌时间。
 - 排程前先获取计划日期范围内的忙碌时间。
 - 由 `availabilityEngine` 从用户每周可用时间中扣除忙碌时间。
+- 支持计划级 `rescheduleBufferMinutes`，默认 15 分钟，用于控制冲突后多久可以重新开始学习。
 - 导出 `.ics` 文件作为兜底能力。
 
 后续：
@@ -159,6 +162,7 @@ MVP：
 - 部分完成：把剩余分钟数重新放回待排程队列。
 - 未完成或跳过：把原日程时长重新放回待排程队列。
 - 顺延：从当前时间之后查找真实可用时间，重新生成后续日程。
+- 顺延时应用 `rescheduleBufferMinutes`，例如冲突日程结束 15 分钟后再开始学习。
 
 复盘和顺延必须保持确定性，方便测试，也方便面试讲解。
 

@@ -27,6 +27,7 @@ MVP 可以使用单个 mock 用户，但模型保留后续扩展空间。
 - `totalMinutes`
 - `startDate`
 - `deadline`
+- `rescheduleBufferMinutes`
 - `status`：`draft`、`generated`、`archived`
 - `createdAt`
 - `updatedAt`
@@ -105,6 +106,7 @@ MVP 可以使用单个 mock 用户，但模型保留后续扩展空间。
 - 日程必须位于计划日期范围内。
 - 日程必须位于匹配的每周可用时间段内。
 - 日程不能与外部忙碌时间冲突。
+- 冲突后顺延生成的新日程必须遵守计划的 `rescheduleBufferMinutes`。
 
 ## BusySlot
 
@@ -169,6 +171,7 @@ model LearningPlan {
   totalMinutes  Int
   startDate     DateTime
   deadline      DateTime
+  rescheduleBufferMinutes Int @default(15)
   status        PlanStatus         @default(draft)
   availability  AvailabilityRule[]
   tasks         LearningTask[]
