@@ -19,9 +19,9 @@ PlanFlow AI 当前是一个文档优先的 TypeScript 全栈项目。应用代�
   - `docs/DATA_MODEL.md`
   - `docs/IMPLEMENTATION_PLAN.md`
   - `docs/TEST_PLAN.md`
-- AI 规划、排程算法、日历导出、API 路由和 UI 组件要按职责分离。
-- `.ics` 导出是 MVP 的日历集成能力。
-- 真实飞书日历同步是后续增强能力，除非用户明确重新调整优先级。
+- AI 规划、日历 provider、真实可用时间计算、排程算法、复盘顺延、日历导出、API 路由和 UI 组件要按职责分离。
+- 飞书日历是核心集成目标，MVP 使用 `CalendarProvider` 和 `MockFeishuCalendarProvider` 模拟忙闲时间。
+- `.ics` 导出是兜底能力，不是唯一日历集成路径。
 
 ## 命令
 
@@ -46,8 +46,10 @@ PlanFlow AI 当前是一个文档优先的 TypeScript 全栈项目。应用代�
 
 - 每周可用时间校验
 - 不均匀星期可用时间下的排程
+- 飞书忙闲时间冲突扣除
 - 任务跨多个日程块拆分
 - 可用时间不足的处理
+- 复盘后的剩余任务顺延
 - AI 输出校验
 - API 契约
 - 日历导出

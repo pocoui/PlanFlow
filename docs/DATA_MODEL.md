@@ -77,6 +77,11 @@ MVP 可以使用单个 mock 用户，但模型保留后续扩展空间。
 - `createdAt`
 - `updatedAt`
 
+关系：
+
+- 拥有多个 `ScheduledSession`
+- 拥有多个 `SessionReview`
+
 ## ScheduledSession
 
 表示一个具体日历时间块。
@@ -90,6 +95,7 @@ MVP 可以使用单个 mock 用户，但模型保留后续扩展空间。
 - `endAt`
 - `durationMinutes`
 - `status`：`scheduled`、`completed`、`missed`、`rescheduled`
+- `externalEventId`
 - `createdAt`
 - `updatedAt`
 
@@ -98,6 +104,49 @@ MVP 可以使用单个 mock 用户，但模型保留后续扩展空间。
 - 一个任务可以对应多个日程。
 - 日程必须位于计划日期范围内。
 - 日程必须位于匹配的每周可用时间段内。
+- 日程不能与外部忙碌时间冲突。
+
+## BusySlot
+
+表示从日历 provider 获取到的外部忙碌时间。
+
+字段：
+
+- `id`
+- `planId`
+- `source`：例如 `mock_feishu` 或 `feishu`
+- `externalEventId`
+- `title`
+- `startAt`
+- `endAt`
+- `createdAt`
+- `updatedAt`
+
+规则：
+
+- MVP 可以由 `MockFeishuCalendarProvider` 生成忙碌时间。
+- 真实飞书接入后，可以缓存查询结果，便于调试和展示。
+
+## SessionReview
+
+表示学习日程结束后的复盘。
+
+字段：
+
+- `id`
+- `sessionId`
+- `taskId`
+- `result`：`completed`、`partial`、`not_completed`、`skipped`
+- `actualMinutes`
+- `remainingMinutes`
+- `reason`
+- `continueTask`
+- `createdAt`
+
+规则：
+
+- `partial`、`not_completed`、`skipped` 会触发顺延。
+- `remainingMinutes` 会重新进入排程队列。
 
 ## 建议 Prisma Schema
 
@@ -124,6 +173,7 @@ model LearningPlan {
   availability  AvailabilityRule[]
   tasks         LearningTask[]
   sessions      ScheduledSession[]
+  busySlots     BusySlot[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 }
@@ -152,6 +202,7 @@ model LearningTask {
   acceptanceCriteria Json
   orderIndex         Int
   sessions           ScheduledSession[]
+  reviews            SessionReview[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
@@ -166,8 +217,37 @@ model ScheduledSession {
   endAt           DateTime
   durationMinutes Int
   status          SessionStatus @default(scheduled)
+  externalEventId String?
+  review          SessionReview?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+}
+
+model BusySlot {
+  id              String       @id @default(cuid())
+  planId          String
+  plan            LearningPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  source          String
+  externalEventId String?
+  title           String
+  startAt         DateTime
+  endAt           DateTime
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model SessionReview {
+  id               String           @id @default(cuid())
+  sessionId        String           @unique
+  session          ScheduledSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  taskId           String
+  task             LearningTask     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  result           ReviewResult
+  actualMinutes    Int
+  remainingMinutes Int
+  reason           String?
+  continueTask     Boolean          @default(true)
+  createdAt        DateTime         @default(now())
 }
 
 enum PlanStatus {
@@ -188,5 +268,13 @@ enum SessionStatus {
   completed
   missed
   rescheduled
+  conflicted
+}
+
+enum ReviewResult {
+  completed
+  partial
+  not_completed
+  skipped
 }
 ```

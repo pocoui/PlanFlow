@@ -8,7 +8,8 @@
 - UI：Tailwind CSS + shadcn/ui
 - 校验：Zod
 - 测试：核心逻辑使用 Vitest，主流程使用 Playwright
-- 日历导出：根据已排程日程生成 `.ics`
+- 日历集成：通过 `CalendarProvider` 抽象读取忙闲、创建外部日历事件；MVP 使用 MockFeishu 忙闲
+- 日历导出：根据已排程日程生成 `.ics` 作为兜底能力
 - AI 提供方：先使用模拟提供方，后续接入兼容 OpenAI 的提供方
 
 ## 仓库结构
@@ -65,7 +66,10 @@ MVP 阶段保持状态管理简单：
 - `plans`：创建和读取学习计划。
 - `availability`：校验并保存每周可用时间规则。
 - `ai`：生成结构化学习任务。
-- `scheduler`：根据任务和可用时间创建日程。
+- `calendarProvider`：读取飞书忙闲，后续创建或更新飞书日历事件。
+- `availabilityEngine`：把每周可用时间扣除忙碌时间，得到真实可用时间。
+- `scheduler`：根据任务和真实可用时间创建日程。
+- `review`：记录学习复盘并计算顺延任务。
 - `calendar`：导出 `.ics`。
 
 Route Handlers 保持轻薄，业务逻辑放在 service 中。第一版不额外引入 Express 或 NestJS，避免增加跨服务联调、CORS 和部署复杂度；后续业务复杂度上升时，可以把 `lib/services` 中的逻辑迁移到独立 Node/NestJS 服务。
@@ -92,7 +96,7 @@ generateLearningTasks(input: GenerateLearningTasksInput): Promise<GeneratedTask[
 排程器输入：
 
 - 带预计分钟数和优先级的任务。
-- 每周可用时间规则。
+- 扣除外部忙碌时间后的真实可用时间。
 - 开始日期。
 - 截止日期。
 
@@ -105,18 +109,31 @@ generateLearningTasks(input: GenerateLearningTasksInput): Promise<GeneratedTask[
 规则：
 
 - 永远不排到可用时间之外。
+- 永远不与飞书忙碌时间冲突。
 - 尊重未启用的星期。
 - 支持同一天多个时间段。
 - 当任务时长超过单个时间段时，允许拆成多个日程。
 - 优先使用更早的可用时间段。
 - 输出保持确定性，方便测试。
 
-## 飞书日历策略
+## 日历集成策略
+
+核心抽象：
+
+```ts
+interface CalendarProvider {
+  getBusySlots(input: GetBusySlotsInput): Promise<BusySlot[]>
+  createCalendarEvent(input: CreateCalendarEventInput): Promise<ExternalCalendarEvent>
+  updateCalendarEvent(input: UpdateCalendarEventInput): Promise<ExternalCalendarEvent>
+}
+```
 
 MVP：
 
-- 导出 `.ics` 文件。
-- 把飞书日历作为后续适配器方案写入文档。
+- 实现 `MockFeishuCalendarProvider`，模拟会议和忙碌时间。
+- 排程前先获取计划日期范围内的忙碌时间。
+- 由 `availabilityEngine` 从用户每周可用时间中扣除忙碌时间。
+- 导出 `.ics` 文件作为兜底能力。
 
 后续：
 
@@ -126,6 +143,24 @@ MVP：
 - 在 API 支持时同步完成状态或提醒信息。
 
 这样即使第三方配置被卡住，项目依然可以完整演示。
+
+## 复盘和顺延设计
+
+每个学习日程结束后，用户提交复盘：
+
+- 完成状态：已完成、部分完成、未完成、跳过
+- 实际学习分钟数
+- 未完成原因
+- 剩余分钟数
+
+`reviewEngine` 根据复盘结果处理：
+
+- 已完成：关闭对应日程，更新任务进度。
+- 部分完成：把剩余分钟数重新放回待排程队列。
+- 未完成或跳过：把原日程时长重新放回待排程队列。
+- 顺延：从当前时间之后查找真实可用时间，重新生成后续日程。
+
+复盘和顺延必须保持确定性，方便测试，也方便面试讲解。
 
 ## 部署
 
@@ -140,12 +175,12 @@ MVP 部署选项：
 - `DATABASE_URL`
 - `AI_PROVIDER`
 - `OPENAI_API_KEY`：启用真实 AI 时使用
-- 飞书凭证：只在真实集成开始后添加
+- 飞书凭证：只在真实 provider 集成开始后添加
 
 ## 错误处理
 
 - API 输入使用结构校验。
-- 对校验错误、AI 解析错误、排程容量不足和导出失败返回类型化错误码。
+- 对校验错误、AI 解析错误、忙闲获取失败、排程容量不足、复盘顺延失败和导出失败返回类型化错误码。
 - 面向用户的错误提示保持简洁。
 - 记录提供方错误时不能泄露密钥。
 

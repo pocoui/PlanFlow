@@ -71,6 +71,15 @@
       "status": "scheduled"
     }
   ],
+  "busySlots": [
+    {
+      "id": "busy_1",
+      "source": "mock_feishu",
+      "title": "临时会议",
+      "startAt": "2026-07-06T20:30:00.000+08:00",
+      "endAt": "2026-07-06T21:00:00.000+08:00"
+    }
+  ],
   "warnings": []
 }
 ```
@@ -80,6 +89,7 @@
 - `INSUFFICIENT_CAPACITY`
 - `AI_ESTIMATE_ADJUSTED`
 - `PARTIAL_TASK_SCHEDULED`
+- `CALENDAR_PROVIDER_UNAVAILABLE`
 
 ## 获取计划详情
 
@@ -130,6 +140,75 @@
 - `completed`
 - `missed`
 - `rescheduled`
+
+## 提交学习复盘
+
+`POST /sessions/:sessionId/review`
+
+请求：
+
+```json
+{
+  "result": "partial",
+  "actualMinutes": 60,
+  "remainingMinutes": 30,
+  "reason": "临时会议打断，Hooks 练习未完成",
+  "continueTask": true
+}
+```
+
+允许的 `result`：
+
+- `completed`
+- `partial`
+- `not_completed`
+- `skipped`
+
+响应：
+
+```json
+{
+  "reviewId": "review_1",
+  "sessionId": "session_1",
+  "taskId": "task_1",
+  "rescheduledSessions": [
+    {
+      "id": "session_2",
+      "taskId": "task_1",
+      "startAt": "2026-07-08T19:30:00.000+08:00",
+      "endAt": "2026-07-08T20:00:00.000+08:00",
+      "status": "scheduled"
+    }
+  ],
+  "warnings": []
+}
+```
+
+规则：
+
+- `partial`、`not_completed`、`skipped` 会触发顺延。
+- 顺延只使用当前时间之后的真实可用时间。
+- 如果截止日期前容量不足，返回 `INSUFFICIENT_CAPACITY` 警告。
+
+## 获取忙碌时间
+
+`GET /plans/:planId/busy-slots?start=2026-07-03&end=2026-07-20`
+
+响应：
+
+```json
+{
+  "provider": "mock_feishu",
+  "busySlots": [
+    {
+      "id": "busy_1",
+      "title": "临时会议",
+      "startAt": "2026-07-06T20:30:00.000+08:00",
+      "endAt": "2026-07-06T21:00:00.000+08:00"
+    }
+  ]
+}
+```
 
 ## 导出日历
 
