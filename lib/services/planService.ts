@@ -1,6 +1,14 @@
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "../db/prisma";
+import { buildIcsCalendar } from "../calendar/calendarExportService";
 import { MockFeishuCalendarProvider } from "../calendar/mockFeishuCalendarProvider";
 import type { CalendarProvider } from "../calendar/calendarProvider";
+import {
+  rescheduleReviewedSession,
+  type ReviewResult,
+  type SessionReviewInput
+} from "../review/reviewEngine";
 import { generateLearningTasks } from "./aiPlanningService";
 import type { GeneratedLearningTask } from "./aiPlanningService";
 import {
@@ -93,10 +101,37 @@ export interface PlanDetails extends PlanRecord {
   };
 }
 
+export interface SessionReviewRecord extends SessionReviewInput {
+  id: string;
+  sessionId: string;
+  taskId: string;
+  createdAt: Date;
+}
+
+export interface SubmitSessionReviewResult {
+  reviewId: string;
+  sessionId: string;
+  taskId: string;
+  rescheduledSessions: ScheduledSessionRecord[];
+  warnings: SchedulerWarning[];
+}
+
+export interface BusySlotsForPlanResult {
+  provider: "mock_feishu";
+  busySlots: BusySlotRecord[];
+}
+
 export interface PlanRepository {
   createPlan(input: CreatePlanRepositoryInput): Promise<PlanRecord>;
   getPlan(planId: string): Promise<PlanRecord | null>;
   savePlanGeneration(input: SavePlanGenerationInput): Promise<GeneratePlanResult>;
+  updateTaskStatus(taskId: string, status: TaskStatus): Promise<LearningTaskRecord>;
+  updateSessionStatus(
+    sessionId: string,
+    status: SessionStatus
+  ): Promise<ScheduledSessionRecord>;
+  getSessionContext(sessionId: string): Promise<SessionReviewContext | null>;
+  saveSessionReview(input: SaveSessionReviewInput): Promise<SubmitSessionReviewResult>;
 }
 
 export interface PlanServiceDependencies {
@@ -115,6 +150,29 @@ interface SavePlanGenerationInput {
   sessions: ScheduledSession[];
   busySlots: BusySlot[];
   warnings: SchedulerWarning[];
+}
+
+interface SessionReviewContext {
+  plan: PlanRecord;
+  session: ScheduledSessionRecord;
+  task: LearningTaskRecord;
+}
+
+interface SaveSessionReviewInput {
+  planId: string;
+  sessionId: string;
+  taskId: string;
+  review: NormalizedSessionReviewInput;
+  originalSessionStatus: SessionStatus;
+  rescheduledSessions: ScheduledSession[];
+  warnings: SchedulerWarning[];
+}
+
+interface NormalizedSessionReviewInput extends SessionReviewInput {
+  result: ReviewResult;
+  actualMinutes: number;
+  remainingMinutes: number;
+  continueTask: boolean;
 }
 
 const MOCK_USER_ID = "mock-user";
@@ -203,6 +261,130 @@ export async function getPlan(
   };
 }
 
+export async function updateTaskStatus(
+  taskId: string,
+  status: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<LearningTaskRecord> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const normalizedStatus = parseTaskStatus(status);
+
+  return repository.updateTaskStatus(taskId, normalizedStatus);
+}
+
+export async function updateSessionStatus(
+  sessionId: string,
+  status: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<ScheduledSessionRecord> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const normalizedStatus = parseSessionStatus(status);
+
+  return repository.updateSessionStatus(sessionId, normalizedStatus);
+}
+
+export async function submitSessionReview(
+  sessionId: string,
+  input: SessionReviewInput,
+  dependencies: PlanServiceDependencies = {}
+): Promise<SubmitSessionReviewResult> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const calendarProvider =
+    dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
+  const context = await repository.getSessionContext(sessionId);
+
+  if (!context) {
+    throw new PlanServiceError("NOT_FOUND", "Session not found.");
+  }
+
+  const review = normalizeSessionReviewInput(input, context.session.durationMinutes);
+  const busySlots = await calendarProvider.getBusySlots({
+    startAt: context.session.endAt,
+    endAt: endOfUtcDay(context.plan.deadline)
+  });
+  const availabilitySlots = calculateRealAvailability({
+    weeklyAvailability: context.plan.availability,
+    busySlots,
+    startAt: context.session.endAt,
+    endAt: endOfUtcDay(context.plan.deadline),
+    bufferMinutes: context.plan.rescheduleBufferMinutes
+  });
+  const rescheduled = rescheduleReviewedSession({
+    session: {
+      id: context.session.id,
+      taskId: context.session.taskId,
+      taskTitle: context.task.title,
+      startAt: context.session.startAt,
+      endAt: context.session.endAt,
+      durationMinutes: context.session.durationMinutes
+    },
+    review,
+    availabilitySlots,
+    bufferMinutes: context.plan.rescheduleBufferMinutes
+  });
+
+  return repository.saveSessionReview({
+    planId: context.plan.id,
+    sessionId,
+    taskId: context.task.id,
+    review,
+    originalSessionStatus:
+      review.result === "completed" ? "completed" : "rescheduled",
+    rescheduledSessions: rescheduled.sessions,
+    warnings: rescheduled.warnings
+  });
+}
+
+export async function getBusySlotsForPlan(
+  planId: string,
+  input: { start: string; end: string },
+  dependencies: PlanServiceDependencies = {}
+): Promise<BusySlotsForPlanResult> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const calendarProvider =
+    dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
+  await requirePlan(planId, repository);
+  const startAt = parseDate(input.start);
+  const endAt = endOfUtcDay(parseDate(input.end));
+
+  if (endAt <= startAt) {
+    throw new PlanServiceError(
+      "VALIDATION_ERROR",
+      "end must be later than start."
+    );
+  }
+
+  const busySlots = await calendarProvider.getBusySlots({ startAt, endAt });
+
+  return {
+    provider: "mock_feishu",
+    busySlots: busySlots.map((slot) => ({
+      ...slot,
+      planId
+    }))
+  };
+}
+
+export async function exportPlanCalendarIcs(
+  planId: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<string> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const plan = await requirePlan(planId, repository);
+  const exportableSessions = plan.sessions.filter(
+    (session) => session.status === "scheduled" || session.status === "completed"
+  );
+
+  if (exportableSessions.length === 0) {
+    throw new PlanServiceError(
+      "CONFLICT",
+      "Plan has no scheduled sessions to export."
+    );
+  }
+
+  return buildIcsCalendar(plan, exportableSessions);
+}
+
 export function createInMemoryPlanRepository(): PlanRepository {
   const plans = new Map<string, PlanRecord>();
 
@@ -270,6 +452,91 @@ export function createInMemoryPlanRepository(): PlanRepository {
         tasks,
         sessions,
         busySlots,
+        warnings: input.warnings
+      };
+    },
+    async updateTaskStatus(taskId, status) {
+      for (const plan of plans.values()) {
+        const task = plan.tasks.find((item) => item.id === taskId);
+
+        if (task) {
+          task.status = status;
+          plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
+          plans.set(plan.id, clonePlan(plan));
+
+          return { ...task, acceptanceCriteria: [...task.acceptanceCriteria] };
+        }
+      }
+
+      throw new PlanServiceError("NOT_FOUND", "Task not found.");
+    },
+    async updateSessionStatus(sessionId, status) {
+      for (const plan of plans.values()) {
+        const session = plan.sessions.find((item) => item.id === sessionId);
+
+        if (session) {
+          session.status = status;
+          plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
+          plans.set(plan.id, clonePlan(plan));
+
+          return copySession(session);
+        }
+      }
+
+      throw new PlanServiceError("NOT_FOUND", "Session not found.");
+    },
+    async getSessionContext(sessionId) {
+      for (const plan of plans.values()) {
+        const session = plan.sessions.find((item) => item.id === sessionId);
+
+        if (!session) {
+          continue;
+        }
+
+        const task = plan.tasks.find((item) => item.id === session.taskId);
+
+        if (!task) {
+          return null;
+        }
+
+        return {
+          plan: clonePlan(plan),
+          session: copySession(session),
+          task: { ...task, acceptanceCriteria: [...task.acceptanceCriteria] }
+        };
+      }
+
+      return null;
+    },
+    async saveSessionReview(input) {
+      const plan = plans.get(input.planId);
+
+      if (!plan) {
+        throw new PlanServiceError("NOT_FOUND", "Plan not found.");
+      }
+
+      const session = plan.sessions.find((item) => item.id === input.sessionId);
+
+      if (!session) {
+        throw new PlanServiceError("NOT_FOUND", "Session not found.");
+      }
+
+      session.status = input.originalSessionStatus;
+      const rescheduledSessions = input.rescheduledSessions.map((item) => ({
+        ...item,
+        id: nextId("session"),
+        planId: input.planId,
+        status: item.status
+      }));
+      plan.sessions.push(...rescheduledSessions);
+      plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
+      plans.set(input.planId, clonePlan(plan));
+
+      return {
+        reviewId: nextId("review"),
+        sessionId: input.sessionId,
+        taskId: input.taskId,
+        rescheduledSessions: rescheduledSessions.map(copySession),
         warnings: input.warnings
       };
     }
@@ -388,17 +655,124 @@ export function createPrismaPlanRepository(): PlanRepository {
         busySlots: result.busySlots.map(mapPrismaBusySlot),
         warnings: input.warnings
       };
+    },
+    async updateTaskStatus(taskId, status) {
+      try {
+        const task = await prisma.learningTask.update({
+          where: { id: taskId },
+          data: { status }
+        });
+
+        return mapPrismaTask(task);
+      } catch (error) {
+        throwNotFoundForMissingRecord(error, "Task not found.");
+        throw error;
+      }
+    },
+    async updateSessionStatus(sessionId, status) {
+      try {
+        const session = await prisma.scheduledSession.update({
+          where: { id: sessionId },
+          data: { status }
+        });
+
+        return mapPrismaSession(session);
+      } catch (error) {
+        throwNotFoundForMissingRecord(error, "Session not found.");
+        throw error;
+      }
+    },
+    async getSessionContext(sessionId) {
+      const session = await prisma.scheduledSession.findUnique({
+        where: { id: sessionId },
+        include: {
+          task: true,
+          plan: {
+            include: planInclude
+          }
+        }
+      });
+
+      if (!session) {
+        return null;
+      }
+
+      return {
+        plan: mapPrismaPlan(session.plan),
+        session: mapPrismaSession(session),
+        task: mapPrismaTask(session.task)
+      };
+    },
+    async saveSessionReview(input) {
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.scheduledSession.update({
+          where: { id: input.sessionId },
+          data: { status: input.originalSessionStatus }
+        });
+        const review = await tx.sessionReview.upsert({
+          where: { sessionId: input.sessionId },
+          update: {
+            result: input.review.result,
+            actualMinutes: input.review.actualMinutes,
+            remainingMinutes: input.review.remainingMinutes,
+            reason: input.review.reason,
+            continueTask: input.review.continueTask
+          },
+          create: {
+            sessionId: input.sessionId,
+            taskId: input.taskId,
+            result: input.review.result,
+            actualMinutes: input.review.actualMinutes,
+            remainingMinutes: input.review.remainingMinutes,
+            reason: input.review.reason,
+            continueTask: input.review.continueTask
+          }
+        });
+        const rescheduledSessions = await Promise.all(
+          input.rescheduledSessions.map((session) =>
+            tx.scheduledSession.create({
+              data: {
+                planId: input.planId,
+                taskId: session.taskId,
+                startAt: session.startAt,
+                endAt: session.endAt,
+                durationMinutes: session.durationMinutes,
+                status: session.status
+              }
+            })
+          )
+        );
+
+        return { review, rescheduledSessions };
+      });
+
+      return {
+        reviewId: result.review.id,
+        sessionId: input.sessionId,
+        taskId: input.taskId,
+        rescheduledSessions: result.rescheduledSessions.map(mapPrismaSession),
+        warnings: input.warnings
+      };
     }
   };
 }
 
 export class PlanServiceError extends Error {
   constructor(
-    public readonly code: "VALIDATION_ERROR" | "NOT_FOUND",
+    public readonly code: "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT",
     message: string,
     public readonly details?: unknown
   ) {
     super(message);
+  }
+}
+
+function throwNotFoundForMissingRecord(error: unknown, message: string): void {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2025"
+  ) {
+    throw new PlanServiceError("NOT_FOUND", message);
   }
 }
 
@@ -472,6 +846,94 @@ function parseDate(value: string): Date {
   return parsed;
 }
 
+function parseTaskStatus(status: string): TaskStatus {
+  const allowed: TaskStatus[] = [
+    "not_started",
+    "in_progress",
+    "completed",
+    "delayed"
+  ];
+
+  if (!allowed.includes(status as TaskStatus)) {
+    throw new PlanServiceError(
+      "VALIDATION_ERROR",
+      "Invalid task status.",
+      { allowed }
+    );
+  }
+
+  return status as TaskStatus;
+}
+
+function parseSessionStatus(status: string): SessionStatus {
+  const allowed: SessionStatus[] = [
+    "scheduled",
+    "completed",
+    "missed",
+    "rescheduled",
+    "conflicted"
+  ];
+
+  if (!allowed.includes(status as SessionStatus)) {
+    throw new PlanServiceError(
+      "VALIDATION_ERROR",
+      "Invalid session status.",
+      { allowed }
+    );
+  }
+
+  return status as SessionStatus;
+}
+
+function normalizeSessionReviewInput(
+  input: SessionReviewInput,
+  sessionMinutes: number
+): NormalizedSessionReviewInput {
+  const allowed: ReviewResult[] = [
+    "completed",
+    "partial",
+    "not_completed",
+    "skipped"
+  ];
+
+  if (!allowed.includes(input.result)) {
+    throw new PlanServiceError(
+      "VALIDATION_ERROR",
+      "Invalid review result.",
+      { allowed }
+    );
+  }
+
+  if (!Number.isInteger(input.actualMinutes) || input.actualMinutes < 0) {
+    throw new PlanServiceError(
+      "VALIDATION_ERROR",
+      "actualMinutes must be greater than or equal to 0."
+    );
+  }
+
+  const remainingMinutes =
+    input.result === "completed"
+      ? 0
+      : input.result === "partial"
+        ? input.remainingMinutes ?? 0
+        : sessionMinutes;
+
+  if (!Number.isInteger(remainingMinutes) || remainingMinutes < 0) {
+    throw new PlanServiceError(
+      "VALIDATION_ERROR",
+      "remainingMinutes must be greater than or equal to 0."
+    );
+  }
+
+  return {
+    result: input.result,
+    actualMinutes: input.actualMinutes,
+    remainingMinutes,
+    reason: input.reason,
+    continueTask: input.continueTask ?? true
+  };
+}
+
 async function requirePlan(
   planId: string,
   repository: PlanRepository
@@ -519,6 +981,14 @@ function clonePlan(plan: PlanRecord): PlanRecord {
       startAt: new Date(slot.startAt),
       endAt: new Date(slot.endAt)
     }))
+  };
+}
+
+function copySession(session: ScheduledSessionRecord): ScheduledSessionRecord {
+  return {
+    ...session,
+    startAt: new Date(session.startAt),
+    endAt: new Date(session.endAt)
   };
 }
 
