@@ -5,7 +5,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock,
-  Download,
+  ExternalLink,
   Loader2,
   Plus,
   Sparkles,
@@ -17,14 +17,6 @@ import {
   createAndGeneratePlan,
   validatePlanCreationForm
 } from "@/lib/client/planCreation";
-import {
-  buildCalendarExportUrl,
-  groupSessionsByDate,
-  markSessionCompleted,
-  markTaskCompleted,
-  submitSessionReview,
-  summarizeGeneratedPlan
-} from "@/lib/client/planDashboard";
 import type {
   GeneratePlanResponse,
   PlanCreationFormState
@@ -77,7 +69,6 @@ export function PlanCreationFlow() {
   const [generation, setGeneration] = useState<GeneratePlanResponse | null>(
     null
   );
-  const [dashboardMessage, setDashboardMessage] = useState("");
   const validation = validatePlanCreationForm(form);
   const visibleBusySlots = useMemo(() => filterBusySlots(form), [form]);
 
@@ -257,12 +248,17 @@ export function PlanCreationFlow() {
             {!generation ? (
               <EmptyState text="Create a plan to see generated tasks, sessions, and warnings." />
             ) : (
-              <PlanDashboard
-                dashboardMessage={dashboardMessage}
-                generation={generation}
-                setDashboardMessage={setDashboardMessage}
-                setGeneration={setGeneration}
-              />
+              <div className="flex flex-col gap-4">
+                <SummaryGrid generation={generation} />
+                <ResultList generation={generation} />
+                <a
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primaryForeground transition hover:bg-teal-800"
+                  href={`/dashboard?planId=${generation.planId}`}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open dashboard
+                </a>
+              </div>
             )}
           </PreviewPanel>
         </aside>
@@ -501,182 +497,6 @@ function ResultList({ generation }: { generation: GeneratePlanResponse }) {
           {warning.message}
         </div>
       ))}
-    </div>
-  );
-}
-
-function PlanDashboard({
-  dashboardMessage,
-  generation,
-  setDashboardMessage,
-  setGeneration
-}: {
-  dashboardMessage: string;
-  generation: GeneratePlanResponse;
-  setDashboardMessage: (message: string) => void;
-  setGeneration: (generation: GeneratePlanResponse) => void;
-}) {
-  const summary = summarizeGeneratedPlan(generation);
-  const groupedSessions = groupSessionsByDate(generation.sessions);
-  const taskTitleById = new Map(
-    generation.tasks.map((task) => [task.id, task.title])
-  );
-
-  async function completeTask(taskId: string) {
-    try {
-      await markTaskCompleted(taskId);
-      setGeneration({
-        ...generation,
-        tasks: generation.tasks.map((task) =>
-          task.id === taskId ? { ...task, status: "completed" } : task
-        )
-      });
-      setDashboardMessage("Task marked completed.");
-    } catch (error) {
-      setDashboardMessage(error instanceof Error ? error.message : "Request failed.");
-    }
-  }
-
-  async function completeSession(sessionId: string) {
-    try {
-      await markSessionCompleted(sessionId);
-      setGeneration({
-        ...generation,
-        sessions: generation.sessions.map((session) =>
-          session.id === sessionId
-            ? { ...session, status: "completed" }
-            : session
-        )
-      });
-      setDashboardMessage("Session marked completed.");
-    } catch (error) {
-      setDashboardMessage(error instanceof Error ? error.message : "Request failed.");
-    }
-  }
-
-  async function reviewSession(sessionId: string) {
-    const session = generation.sessions.find((item) => item.id === sessionId);
-
-    if (!session) {
-      return;
-    }
-
-    try {
-      const result = await submitSessionReview(sessionId, {
-        result: "partial",
-        actualMinutes: Math.max(0, Math.floor((session.durationMinutes ?? 60) / 2)),
-        remainingMinutes: Math.max(0, Math.ceil((session.durationMinutes ?? 60) / 2)),
-        reason: "Needs another focused block",
-        continueTask: true
-      });
-      setGeneration({
-        ...generation,
-        sessions: [
-          ...generation.sessions.map((item) =>
-            item.id === sessionId ? { ...item, status: "rescheduled" } : item
-          ),
-          ...result.rescheduledSessions
-        ],
-        warnings: [...generation.warnings, ...result.warnings]
-      });
-      setDashboardMessage("Review submitted and remaining work rescheduled.");
-    } catch (error) {
-      setDashboardMessage(error instanceof Error ? error.message : "Request failed.");
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <SummaryGrid generation={generation} />
-      <div className="grid grid-cols-2 gap-2">
-        <Metric label="Minutes" value={summary.scheduledMinutes} />
-        <Metric label="Busy" value={summary.busySlots} />
-      </div>
-      {dashboardMessage ? (
-        <div className="rounded-md border border-border bg-white p-3 text-sm text-slate-700">
-          {dashboardMessage}
-        </div>
-      ) : null}
-      <a
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-primary"
-        href={buildCalendarExportUrl(generation.planId)}
-      >
-        <Download className="h-4 w-4" />
-        Export .ics
-      </a>
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-slate-700">Week calendar</h3>
-        {groupedSessions.map((group) => (
-          <div className="rounded-md border border-border bg-white p-3" key={group.date}>
-            <div className="mb-2 text-sm font-semibold">{group.date}</div>
-            <div className="flex flex-col gap-2">
-              {group.sessions.map((session) => (
-                <div
-                  className="rounded-md bg-slate-50 p-2 text-sm text-slate-700"
-                  key={session.id}
-                >
-                  <div className="font-medium">
-                    {taskTitleById.get(session.taskId) ?? "Learning session"}
-                  </div>
-                  <div className="mt-1">
-                    {formatTime(session.startAt)} - {formatTime(session.endAt)}
-                    {" - "}
-                    {session.status}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      className="small-action"
-                      type="button"
-                      onClick={() => completeSession(session.id)}
-                    >
-                      Complete
-                    </button>
-                    <button
-                      className="small-action"
-                      type="button"
-                      onClick={() => reviewSession(session.id)}
-                    >
-                      Review partial
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-slate-700">Task list</h3>
-        {generation.tasks.map((task) => (
-          <div className="rounded-md border border-border bg-white p-3" key={task.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{task.title}</div>
-                <div className="mt-1 text-sm text-slate-600">
-                  {task.estimatedMinutes} min - {task.status ?? "not_started"}
-                </div>
-              </div>
-              <button
-                className="small-action"
-                type="button"
-                onClick={() => completeTask(task.id)}
-              >
-                Complete
-              </button>
-            </div>
-          </div>
-        ))}
-      </section>
-      <ResultList generation={generation} />
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-border bg-white p-3">
-      <div className="text-xs font-medium uppercase text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>
   );
 }

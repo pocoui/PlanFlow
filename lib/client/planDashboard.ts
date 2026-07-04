@@ -132,6 +132,35 @@ export async function submitSessionReview(
   return parseJsonResponse(response);
 }
 
+export interface DashboardPlan {
+  id: string;
+  title: string;
+  goal: string;
+  totalMinutes: number;
+  startDate: string;
+  deadline: string;
+  status: string;
+  tasks: DashboardTask[];
+  sessions: DashboardSession[];
+  busySlots: DashboardBusySlot[];
+  warnings: DashboardWarning[];
+  progress: {
+    totalTasks: number;
+    completedTasks: number;
+    totalSessions: number;
+    completedSessions: number;
+  };
+}
+
+export async function fetchPlanDashboard(
+  planId: string,
+  fetcher: DashboardFetcher = fetch
+): Promise<DashboardPlan> {
+  const response = await fetcher(`/api/plans/${planId}`);
+
+  return parseJsonResponse(response);
+}
+
 export function buildCalendarExportUrl(planId: string): string {
   return `/api/plans/${planId}/calendar.ics`;
 }
