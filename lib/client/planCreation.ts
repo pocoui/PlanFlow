@@ -36,6 +36,7 @@ export interface GeneratePlanResponse {
     phase?: string;
     estimatedMinutes: number;
     priority?: number;
+    status?: string;
     acceptanceCriteria?: string[];
   }>;
   sessions: Array<{
