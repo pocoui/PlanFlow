@@ -8,7 +8,6 @@ import {
   Clock,
   Download,
   Loader2,
-  RotateCcw,
   Settings,
   Sparkles,
   X
@@ -25,7 +24,6 @@ import {
   type GeneratedTask
 } from "@/lib/client/planCreation";
 import type {
-  DashboardBusySlot,
   DashboardGeneration,
   DashboardSession,
   SessionReviewPayload
@@ -47,7 +45,6 @@ import {
 export type WizardStep =
   | "plan-info"
   | "availability"
-  | "busy-sync"
   | "task-confirm"
   | "calendar-board"
   | "review";
@@ -78,7 +75,6 @@ interface WizardState {
 const stepOrder: WizardStep[] = [
   "plan-info",
   "availability",
-  "busy-sync",
   "task-confirm",
   "calendar-board",
   "review"
@@ -87,7 +83,6 @@ const stepOrder: WizardStep[] = [
 const stepLabels: Record<WizardStep, string> = {
   "plan-info": "创建学习计划",
   availability: "每周可学习时间",
-  "busy-sync": "飞书忙闲同步",
   "task-confirm": "AI任务拆解确认",
   "calendar-board": "内部日历排程看板",
   review: "学习复盘与顺延"
@@ -135,11 +130,9 @@ export function PlanWizard() {
       ? validatePlanInfo(state.planInfo).valid
       : currentStep === "availability"
         ? validateAvailabilityState(state.availability).valid
-        : currentStep === "busy-sync"
-          ? !!state.planId
-          : currentStep === "task-confirm"
-            ? !!state.tasks && state.tasks.length > 0
-            : true;
+        : currentStep === "task-confirm"
+          ? !!state.tasks && state.tasks.length > 0
+          : true;
 
   const setPlanInfo = useCallback((patch: Partial<PlanInfo>) => {
     setState((prev) => ({
@@ -190,28 +183,10 @@ export function PlanWizard() {
       const payload = buildCreatePlanPayload(state.planInfo, state.availability);
       const plan = await postJson<CreatedPlanResponse>("/api/plans", payload);
       setState((prev) => ({ ...prev, planId: plan.id }));
-      showInfo("计划创建成功，下一步同步飞书忙闲时间。");
-      setCurrentStep("busy-sync");
-    } catch (error) {
-      showError(error instanceof Error ? error.message : "创建计划失败");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGenerateTasks() {
-    if (!state.planId) return;
-
-    setLoading(true);
-    setMessage(null);
-
-    try {
-      const result = await generatePlanTasks(state.planId);
-      setState((prev) => ({ ...prev, tasks: result.tasks }));
-      showInfo("AI 任务拆解完成，请确认后生成排程。");
+      showInfo("计划创建成功，正在生成 AI 任务...");
       setCurrentStep("task-confirm");
     } catch (error) {
-      showError(error instanceof Error ? error.message : "任务拆解失败");
+      showError(error instanceof Error ? error.message : "创建计划失败");
     } finally {
       setLoading(false);
     }
@@ -245,11 +220,6 @@ export function PlanWizard() {
   function goNext() {
     if (currentStep === "availability") {
       void handleCreatePlan();
-      return;
-    }
-
-    if (currentStep === "busy-sync") {
-      void handleGenerateTasks();
       return;
     }
 
@@ -305,14 +275,6 @@ export function PlanWizard() {
             <StepAvailability
               availability={state.availability}
               onChange={setAvailability}
-            />
-          ) : null}
-
-          {currentStep === "busy-sync" ? (
-            <StepBusySync
-              availability={state.availability}
-              planId={state.planId}
-              onContinue={() => setCurrentStep("task-confirm")}
             />
           ) : null}
 
@@ -723,179 +685,6 @@ function StepAvailability({
   );
 }
 
-function StepBusySync({
-  availability,
-  planId,
-  onContinue
-}: {
-  availability: DailyAvailability[];
-  planId: string | null;
-  onContinue: () => void;
-}) {
-  const [slots, setSlots] = useState<DashboardBusySlot[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  async function sync() {
-    if (!planId) return;
-
-    setLoading(true);
-    try {
-      const result = await fetch(`/api/plans/${planId}/busy-slots?start=&end=`);
-      const data = (await result.json()) as {
-        busySlots?: DashboardBusySlot[];
-      };
-      setSlots(data.busySlots ?? []);
-    } catch {
-      // 同步失败时仍使用示例忙碌时间，不影响后续流程。
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <section className="flex flex-col gap-5">
-      <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4 text-sm text-slate-600">
-        同步飞书日历，AI 将扣除忙碌时间并计算真实可用学习时间。
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-3">
-        <BusyPanel title="可学习时间" type="available">
-          <div className="space-y-2 text-sm">
-            {availability.map((day) => (
-              <BusyRow
-                key={day.weekday}
-                weekday={day.label}
-                text={
-                  day.enabled && day.ranges.length > 0
-                    ? day.ranges.map((r) => `${r.startTime}-${r.endTime}`).join("、")
-                    : "无"
-                }
-              />
-            ))}
-          </div>
-        </BusyPanel>
-
-        <BusyPanel title="扣除冲突后真实可用时间" type="result">
-          <div className="space-y-2 text-sm">
-            {availability.map((day) => (
-              <BusyRow
-                key={day.weekday}
-                weekday={day.label}
-                text={
-                  day.enabled && day.ranges.length > 0
-                    ? day.ranges.map((r) => `${r.startTime}-${r.endTime}`).join("、")
-                    : "无"
-                }
-              />
-            ))}
-          </div>
-        </BusyPanel>
-
-        <BusyPanel title="飞书忙碌时间" type="busy">
-          <div className="space-y-2 text-sm">
-            {slots.length === 0 ? (
-              <>
-                <BusyRow weekday="周一" text="09:00 - 10:30 临时会议" />
-                <BusyRow weekday="周三" text="10:30 - 12:00 团队周会" />
-              </>
-            ) : (
-              slots.map((slot) => (
-                <BusyRow
-                  key={slot.id}
-                  weekday={formatWeekday(slot.startAt)}
-                  text={`${formatTime(slot.startAt)} - ${formatTime(slot.endAt)} ${slot.title}`}
-                />
-              ))
-            )}
-          </div>
-        </BusyPanel>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="flex items-center gap-1">
-            <span className="h-3 w-3 rounded-sm bg-primary" />
-            可学习时间
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-3 w-3 rounded-sm bg-red-400" />
-            忙碌时间
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-3 w-3 rounded-sm bg-emerald-400" />
-            可用时间
-          </span>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-primary"
-            disabled={loading || !planId}
-            type="button"
-            onClick={() => onContinue()}
-          >
-            跳过同步
-          </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
-            disabled={loading || !planId}
-            type="button"
-            onClick={() => sync()}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCcw className="h-4 w-4" />
-            )}
-            重新同步
-          </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
-            disabled={loading || !planId}
-            type="button"
-            onClick={() => onContinue()}
-          >
-            下一步
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function BusyPanel({
-  children,
-  title,
-  type
-}: {
-  children: React.ReactNode;
-  title: string;
-  type: "available" | "busy" | "result";
-}) {
-  const colors = {
-    available: "border-primary/20 bg-primary/5",
-    busy: "border-red-100 bg-red-50",
-    result: "border-emerald-100 bg-emerald-50"
-  };
-
-  return (
-    <div className={`rounded-lg border p-4 ${colors[type]}`}>
-      <h3 className="mb-3 text-sm font-bold text-slate-800">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function BusyRow({ weekday, text }: { weekday: string; text: string }) {
-  return (
-    <div className="flex items-start gap-3 text-slate-700">
-      <span className="w-10 shrink-0 font-medium">{weekday}</span>
-      <span>{text}</span>
-    </div>
-  );
-}
-
 function StepTaskConfirm({
   planId,
   planInfo,
@@ -1176,14 +965,6 @@ function StepCalendarBoard({
 
         {/* 底部操作 */}
         <div className="flex flex-wrap justify-end gap-3">
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-primary disabled:opacity-50"
-            disabled
-            type="button"
-          >
-            <RotateCcw className="h-4 w-4" />
-            同步飞书
-          </button>
           <a
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800"
             href={buildCalendarExportUrl(generation.planId)}
