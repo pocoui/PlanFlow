@@ -11,7 +11,7 @@ import {
   Sparkles,
   X
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   buildCalendarExportUrl,
@@ -78,9 +78,11 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
     }
   }, [planId]);
 
-  if (viewState === "loading" && !plan) {
-    void loadPlan();
-  }
+  useEffect(() => {
+    if (viewState === "loading" && !plan) {
+      void loadPlan();
+    }
+  }, [viewState, plan, loadPlan]);
 
   const sessions = useMemo(() => plan?.sessions ?? [], [plan]);
   const tasks = useMemo(() => plan?.tasks ?? [], [plan]);

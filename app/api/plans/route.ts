@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { createPlan, PlanServiceError } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const plan = await createPlan(body);
+    const plan = await createPlan(body, { repository: getRepository() });
 
     return NextResponse.json(
       {

@@ -4,6 +4,7 @@ import {
   getBusySlotsForPlan,
   PlanServiceError
 } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
   params: Promise<{
@@ -18,7 +19,7 @@ export async function GET(request: Request, context: RouteContext) {
     const result = await getBusySlotsForPlan(planId, {
       start: searchParams.get("start") ?? "",
       end: searchParams.get("end") ?? ""
-    });
+    }, { repository: getRepository() });
 
     return NextResponse.json(result);
   } catch (error) {

@@ -4,6 +4,7 @@ import {
   exportPlanCalendarIcs,
   PlanServiceError
 } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
   params: Promise<{
@@ -14,7 +15,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    const calendar = await exportPlanCalendarIcs(planId);
+    const calendar = await exportPlanCalendarIcs(planId, { repository: getRepository() });
 
     return new NextResponse(calendar, {
       headers: {

@@ -4,6 +4,7 @@ import {
   PlanServiceError,
   submitSessionReview
 } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
   params: Promise<{
@@ -15,7 +16,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
     const body = await request.json();
-    const result = await submitSessionReview(sessionId, body);
+    const result = await submitSessionReview(sessionId, body, { repository: getRepository() });
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

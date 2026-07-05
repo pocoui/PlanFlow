@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { PlanServiceError, updateTaskStatus } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
   params: Promise<{
@@ -12,7 +13,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { taskId } = await context.params;
     const body = await request.json();
-    const task = await updateTaskStatus(taskId, body.status);
+    const task = await updateTaskStatus(taskId, body.status, { repository: getRepository() });
 
     return NextResponse.json(task);
   } catch (error) {

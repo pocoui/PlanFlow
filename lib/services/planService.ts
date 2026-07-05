@@ -176,7 +176,15 @@ interface NormalizedSessionReviewInput extends SessionReviewInput {
 }
 
 const MOCK_USER_ID = "mock-user";
-let idCounter = 0;
+const globalForIdCounter = globalThis as unknown as {
+  __planflowIdCounter?: number;
+};
+
+let idCounter: number = globalForIdCounter.__planflowIdCounter ?? 0;
+
+function persistIdCounter(): void {
+  globalForIdCounter.__planflowIdCounter = idCounter;
+}
 
 export async function createPlan(
   input: CreatePlanInput,
@@ -955,6 +963,7 @@ function endOfUtcDay(date: Date): Date {
 
 function nextId(prefix: string): string {
   idCounter += 1;
+  persistIdCounter();
 
   return `${prefix}_${idCounter}`;
 }

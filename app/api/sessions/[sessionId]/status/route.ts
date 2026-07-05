@@ -4,6 +4,7 @@ import {
   PlanServiceError,
   updateSessionStatus
 } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
   params: Promise<{
@@ -15,7 +16,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
     const body = await request.json();
-    const session = await updateSessionStatus(sessionId, body.status);
+    const session = await updateSessionStatus(sessionId, body.status, { repository: getRepository() });
 
     return NextResponse.json(session);
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPlan, PlanServiceError } from "@/lib/services/planService";
+import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
   params: Promise<{
@@ -11,7 +12,7 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    const plan = await getPlan(planId);
+    const plan = await getPlan(planId, { repository: getRepository() });
 
     return NextResponse.json(plan);
   } catch (error) {
