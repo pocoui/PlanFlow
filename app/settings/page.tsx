@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Save, Sparkles } from "lucide-react";
+import { CheckCircle2, Loader2, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 // 设置页面——配置 AI Agent API。
@@ -155,71 +155,54 @@ export default function SettingsPage() {
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           {/* Provider 选择 */}
-          <section className="mb-8">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">AI 提供方</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                className={`rounded-lg border-2 p-4 text-left transition ${
-                  form.provider === "mock"
-                    ? "border-primary bg-primary/5"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-                type="button"
-                onClick={() => setForm((prev) => ({ ...prev, provider: "mock" }))}
-              >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-slate-900">Mock 模式</span>
-                </div>
-                <p className="mt-1 text-sm text-slate-600">
-                  使用内置示例任务，无需配置 API Key
-                </p>
-              </button>
+          <section className="space-y-5">
+            <h2 className="text-lg font-semibold text-slate-900">AI 提供方</h2>
 
-              <button
-                className={`rounded-lg border-2 p-4 text-left transition ${
-                  form.provider === "openai_compatible"
-                    ? "border-primary bg-primary/5"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-                type="button"
-                onClick={() =>
-                  setForm((prev) => ({ ...prev, provider: "openai_compatible" }))
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                选择 AI 提供方
+              </label>
+              <select
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                value={form.provider}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    provider: e.target.value as "mock" | "openai_compatible"
+                  }))
                 }
               >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-slate-900">OpenAI 兼容 API</span>
-                </div>
-                <p className="mt-1 text-sm text-slate-600">
-                  支持 OpenAI、DeepSeek、Kimi、Ollama 等
-                </p>
-              </button>
+                <option value="mock">Mock 模式（内置示例任务，无需 API Key）</option>
+                <option value="openai_compatible">OpenAI 兼容 API（支持 OpenAI、DeepSeek、Kimi、Ollama 等）</option>
+              </select>
             </div>
           </section>
 
           {/* OpenAI 兼容配置 */}
           {form.provider === "openai_compatible" ? (
-            <section className="space-y-5">
+            <section className="mt-6 space-y-5">
               <h2 className="text-lg font-semibold text-slate-900">API 配置</h2>
 
-              {/* 预设快捷选择 */}
+              {/* 预设下拉选择 */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   快捷预设
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  onChange={(e) => {
+                    const preset = PRESET_MODELS.find((p) => p.label === e.target.value);
+                    if (preset) applyPreset(preset.baseUrl, preset.model);
+                  }}
+                  value=""
+                >
+                  <option value="">选择预设...</option>
                   {PRESET_MODELS.map((preset) => (
-                    <button
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-primary hover:text-primary"
-                      key={preset.label}
-                      type="button"
-                      onClick={() => applyPreset(preset.baseUrl, preset.model)}
-                    >
+                    <option key={preset.label} value={preset.label}>
                       {preset.label}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
 
               <div>
