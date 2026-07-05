@@ -19,7 +19,9 @@ describe("planDashboard", () => {
       totalSessions: 2,
       scheduledMinutes: 150,
       busySlots: 1,
-      warnings: 0
+      warnings: 0,
+      progressPercent: 0,
+      completedHours: 0
     });
   });
 

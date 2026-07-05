@@ -44,6 +44,8 @@ export interface DashboardSummary {
   scheduledMinutes: number;
   busySlots: number;
   warnings: number;
+  progressPercent: number;
+  completedHours: number;
 }
 
 export interface SessionReviewPayload {
@@ -62,15 +64,27 @@ export type DashboardFetcher = (
 export function summarizeGeneratedPlan(
   generation: DashboardGeneration
 ): DashboardSummary {
+  const totalSessions = generation.sessions.length;
+  const completedSessions = generation.sessions.filter(
+    (session) => session.status === "completed"
+  ).length;
+  const scheduledMinutes = generation.sessions.reduce(
+    (total, session) => total + getSessionMinutes(session),
+    0
+  );
+  const completedMinutes = generation.sessions
+    .filter((session) => session.status === "completed")
+    .reduce((total, session) => total + getSessionMinutes(session), 0);
+
   return {
     totalTasks: generation.tasks.length,
-    totalSessions: generation.sessions.length,
-    scheduledMinutes: generation.sessions.reduce(
-      (total, session) => total + getSessionMinutes(session),
-      0
-    ),
+    totalSessions,
+    scheduledMinutes,
     busySlots: generation.busySlots.length,
-    warnings: generation.warnings.length
+    warnings: generation.warnings.length,
+    progressPercent:
+      totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0,
+    completedHours: Math.round((completedMinutes / 60) * 10) / 10
   };
 }
 
