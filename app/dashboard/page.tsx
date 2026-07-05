@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Loader2, Plus, Sparkles } from "lucide-react";
+import { CalendarDays, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";

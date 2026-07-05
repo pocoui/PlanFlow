@@ -9,7 +9,10 @@ import {
   type ReviewResult,
   type SessionReviewInput
 } from "../review/reviewEngine";
-import { generateLearningTasks } from "./aiPlanningService";
+import {
+  generateLearningTasks,
+  createProviderFromConfig
+} from "./aiPlanningService";
 import type {
   GeneratedLearningTask,
   GeneratedTaskValidationWarning
@@ -149,6 +152,14 @@ export interface PlanRepository {
 export interface PlanServiceDependencies {
   repository?: PlanRepository;
   calendarProvider?: CalendarProvider;
+  aiConfig?: {
+    provider: "mock" | "openai_compatible";
+    openai: {
+      baseUrl: string;
+      model: string;
+      apiKey: string;
+    };
+  };
 }
 
 interface CreatePlanRepositoryInput
@@ -246,11 +257,14 @@ export async function generatePlanTasks(
 ): Promise<GeneratePlanTasksResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const plan = await requirePlan(planId, repository);
+  const provider = dependencies.aiConfig
+    ? createProviderFromConfig(dependencies.aiConfig)
+    : undefined;
   const generation = await generateLearningTasks({
     title: plan.title,
     goal: plan.goal,
     totalMinutes: plan.totalMinutes
-  });
+  }, provider);
   const tasks = await repository.savePlanTasks({
     planId,
     tasks: generation.tasks,

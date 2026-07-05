@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { generatePlanTasks, PlanServiceError } from "@/lib/services/planService";
+import { getAiConfig } from "@/lib/server/aiConfig";
 import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
@@ -12,7 +13,10 @@ interface RouteContext {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    const result = await generatePlanTasks(planId, { repository: getRepository() });
+    const result = await generatePlanTasks(planId, {
+      repository: getRepository(),
+      aiConfig: getAiConfig()
+    });
 
     return NextResponse.json(result);
   } catch (error) {

@@ -88,8 +88,30 @@ generateLearningTasks(input: GenerateLearningTasksInput): Promise<GeneratedTask[
 - 返回结构化任务。
 - 返回前校验输出结构。
 - 支持用于开发和测试的模拟实现。
+- 支持通过 OpenAI 兼容接口调用真实 AI Agent。
 
-真实提供方后续通过同一接口接入。
+### AI Provider 架构
+
+```
+AiPlanningProvider (接口)
+├── MockAiPlanningProvider — 内置示例任务，无需 API Key
+└── OpenAiCompatibleProvider — 调用兼容 OpenAI Chat Completions 的 Agent API
+    支持：OpenAI、DeepSeek、Kimi、Ollama 等
+    配置项：baseUrl / model / apiKey
+```
+
+Provider 选择策略：
+
+- 通过 `GET/PUT /api/settings/ai` 配置 `provider` 字段。
+- `provider: "mock"` → 使用 `MockAiPlanningProvider`。
+- `provider: "openai_compatible"` 且 `baseUrl` + `apiKey` 非空 → 使用 `OpenAiCompatibleProvider`。
+- 配置缺失或无效时，降级为 `MockAiPlanningProvider`。
+
+配置存储：
+
+- 服务端内存（globalThis），防止 HMR 重置，重启后重新从环境变量加载。
+- 环境变量 `AI_PROVIDER`、`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY` 作为默认值。
+- 前端设置页 `/settings` 可实时修改配置，API Key 脱敏返回（仅展示前4后4位）。
 
 ## 排程设计
 
@@ -177,8 +199,10 @@ MVP 部署选项：
 环境变量：
 
 - `DATABASE_URL`
-- `AI_PROVIDER`
-- `OPENAI_API_KEY`：启用真实 AI 时使用
+- `AI_PROVIDER`：`mock`（默认）或 `openai_compatible`
+- `OPENAI_BASE_URL`：Agent API 基础地址，如 `https://api.openai.com/v1`
+- `OPENAI_MODEL`：模型名称，如 `gpt-4o`
+- `OPENAI_API_KEY`：API 密钥
 - 飞书凭证：只在真实 provider 集成开始后添加
 
 ## 错误处理

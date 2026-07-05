@@ -20,7 +20,7 @@ const navItems = [
   { label: "日历", href: "/dashboard", icon: CalendarDays },
   { label: "任务", href: "#", icon: Layers },
   { label: "数据", href: "#", icon: BarChart3 },
-  { label: "设置", href: "#", icon: Settings }
+  { label: "设置", href: "/settings", icon: Settings }
 ];
 
 export function AppSidebar() {

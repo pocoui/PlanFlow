@@ -62,7 +62,8 @@ export async function generateLearningTasks(
   input: GenerateLearningTasksInput,
   provider: AiPlanningProvider = new MockAiPlanningProvider()
 ): Promise<GenerateLearningTasksResult> {
-  const tasks = await provider.generateLearningTasks(input);
+  const activeProvider = provider;
+  const tasks = await activeProvider.generateLearningTasks(input);
   const validation = validateGeneratedTasks({
     targetTotalMinutes: input.totalMinutes,
     tasks
@@ -78,6 +79,22 @@ export async function generateLearningTasks(
   };
 }
 
+// 根据当前配置创建对应的 Provider 实例
+export function createProviderFromConfig(config: {
+  provider: "mock" | "openai_compatible";
+  openai: OpenAiCompatibleConfig;
+}): AiPlanningProvider {
+  if (
+    config.provider === "openai_compatible" &&
+    config.openai.baseUrl &&
+    config.openai.apiKey
+  ) {
+    return new OpenAiCompatibleProvider(config.openai);
+  }
+
+  return new MockAiPlanningProvider();
+}
+
 export class MockAiPlanningProvider implements AiPlanningProvider {
   constructor(private readonly tasks?: GeneratedLearningTask[]) {}
 
@@ -90,6 +107,129 @@ export class MockAiPlanningProvider implements AiPlanningProvider {
 
     return buildMockTasks(input);
   }
+}
+
+// ─── OpenAI 兼容 Provider ───────────────────────────────────
+// 支持所有兼容 OpenAI Chat Completions 接口的 Agent API
+// （OpenAI、DeepSeek、Kimi、Ollama 等），只需配置 baseUrl + model + apiKey。
+
+export interface OpenAiCompatibleConfig {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+}
+
+const OPENAI_DEFAULT_SYSTEM_PROMPT = `你是一个专业的学习规划师。用户会给你学习目标和总时长，你需要将目标拆解为结构化的学习任务。
+
+要求：
+1. 每个任务必须包含：阶段(phase)、标题(title)、描述(description)、预计时长(estimatedMinutes)、优先级(priority)、验收标准(acceptanceCriteria)
+2. 任务应按学习逻辑分阶段，从基础到高级
+3. 所有任务的预计时长之和应接近用户指定的总时长
+4. 验收标准应具体可衡量
+
+你必须以 JSON 数组格式返回，不要包含任何其他文本。格式如下：
+[
+  {
+    "phase": "阶段名称",
+    "title": "任务标题",
+    "description": "任务描述",
+    "estimatedMinutes": 120,
+    "priority": 1,
+    "acceptanceCriteria": ["标准1", "标准2"]
+  }
+]`;
+
+export class OpenAiCompatibleProvider implements AiPlanningProvider {
+  constructor(private readonly config: OpenAiCompatibleConfig) {}
+
+  async generateLearningTasks(
+    input: GenerateLearningTasksInput
+  ): Promise<GeneratedLearningTask[]> {
+    const url = `${this.config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+    const userMessage = [
+      `学习目标：${input.goal}`,
+      `总学习时长：${input.totalMinutes} 分钟（约 ${Math.round(input.totalMinutes / 60 * 10) / 10} 小时）`,
+      "",
+      "请将上述学习目标拆解为结构化的学习任务列表。"
+    ].join("\n");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        messages: [
+          { role: "system", content: OPENAI_DEFAULT_SYSTEM_PROMPT },
+          { role: "user", content: userMessage }
+        ],
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      throw new Error(
+        `AI API 请求失败 (${response.status}): ${errorBody.slice(0, 200)}`
+      );
+    }
+
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("AI 返回内容为空");
+    }
+
+    return parseAiTasks(content);
+  }
+}
+
+// 解析 AI 返回的 JSON 任务列表，容错处理 markdown 代码块包裹
+function parseAiTasks(content: string): GeneratedLearningTask[] {
+  let jsonText = content.trim();
+
+  // 去掉 markdown 代码块包裹：```json ... ```
+  const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    jsonText = codeBlockMatch[1].trim();
+  }
+
+  let parsed: Array<{
+    phase?: string;
+    title?: string;
+    description?: string;
+    estimatedMinutes?: number;
+    priority?: number;
+    acceptanceCriteria?: string[];
+  }>;
+
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    throw new Error("AI 返回的 JSON 格式无效，请重试或检查模型配置。");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("AI 返回的不是任务数组，请重试或检查模型配置。");
+  }
+
+  return parsed.map((item, index) => ({
+    id: `ai-task-${index + 1}`,
+    phase: item.phase ?? "其他",
+    title: item.title ?? `任务 ${index + 1}`,
+    description: item.description ?? "",
+    estimatedMinutes: typeof item.estimatedMinutes === "number" ? item.estimatedMinutes : 60,
+    priority: typeof item.priority === "number" ? item.priority : index + 1,
+    acceptanceCriteria: Array.isArray(item.acceptanceCriteria)
+      ? item.acceptanceCriteria.filter((c): c is string => typeof c === "string")
+      : ["完成学习"],
+    orderIndex: index
+  }));
 }
 
 export function validateGeneratedTasks({

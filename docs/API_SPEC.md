@@ -238,3 +238,57 @@
   }
 }
 ```
+
+## AI 配置
+
+### 获取 AI 配置
+
+`GET /settings/ai`
+
+响应：
+
+```json
+{
+  "provider": "mock",
+  "openai": {
+    "baseUrl": "",
+    "model": "",
+    "apiKeyConfigured": false,
+    "apiKeyPreview": ""
+  }
+}
+```
+
+字段说明：
+
+- `provider`：当前 AI 提供方，`mock` 或 `openai_compatible`。
+- `openai.baseUrl`：OpenAI 兼容 API 基础地址。
+- `openai.model`：模型名称。
+- `openai.apiKeyConfigured`：API Key 是否已配置。
+- `openai.apiKeyPreview`：API Key 脱敏预览（前4后4位），未配置时为空字符串。
+
+### 更新 AI 配置
+
+`PUT /settings/ai`
+
+请求：
+
+```json
+{
+  "provider": "openai_compatible",
+  "openai": {
+    "baseUrl": "https://api.openai.com/v1",
+    "model": "gpt-4o",
+    "apiKey": "sk-xxxxxxxxxxxxxxxx"
+  }
+}
+```
+
+字段说明：
+
+- `provider`：必填，`mock` 或 `openai_compatible`。
+- `openai.baseUrl`：provider 为 `openai_compatible` 时必填。
+- `openai.model`：provider 为 `openai_compatible` 时必填。
+- `openai.apiKey`：新 API Key，留空则保持已有配置不变。
+
+响应与 `GET /settings/ai` 相同（脱敏后）。
