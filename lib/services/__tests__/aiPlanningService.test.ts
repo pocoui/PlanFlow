@@ -9,16 +9,29 @@ import type { GeneratedLearningTask } from "../aiPlanningService";
 
 describe("aiPlanningService", () => {
   it("generates structured mock learning tasks", async () => {
-    const tasks = await generateLearningTasks({
+    const result = await generateLearningTasks({
       title: "React learning plan",
       goal: "Learn React fundamentals",
       totalMinutes: 180
     });
 
-    expect(tasks).toHaveLength(3);
-    expect(tasks.map((task) => task.orderIndex)).toEqual([0, 1, 2]);
-    expect(tasks.every((task) => task.acceptanceCriteria.length > 0)).toBe(true);
-    expect(totalMinutes(tasks)).toBe(180);
+    expect(result.tasks).toHaveLength(9);
+    expect(result.tasks.map((task) => task.orderIndex)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8
+    ]);
+    expect(result.tasks.map((task) => task.phase)).toEqual([
+      "基础",
+      "基础",
+      "基础",
+      "Hooks",
+      "Hooks",
+      "Router",
+      "Router",
+      "项目实战",
+      "项目实战"
+    ]);
+    expect(result.tasks.every((task) => task.acceptanceCriteria.length > 0)).toBe(true);
+    expect(totalMinutes(result.tasks)).toBe(180);
   });
 
   it("uses an injected provider boundary for future real AI integrations", async () => {
@@ -26,7 +39,7 @@ describe("aiPlanningService", () => {
       validTask({ id: "custom-1", title: "Custom task", estimatedMinutes: 30 })
     ]);
 
-    const tasks = await generateLearningTasks(
+    const result = await generateLearningTasks(
       {
         title: "Custom plan",
         goal: "Use injected provider",
@@ -35,9 +48,10 @@ describe("aiPlanningService", () => {
       provider
     );
 
-    expect(tasks).toEqual([
+    expect(result.tasks).toEqual([
       validTask({ id: "custom-1", title: "Custom task", estimatedMinutes: 30 })
     ]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("accepts valid generated tasks without warnings", () => {

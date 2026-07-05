@@ -18,12 +18,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { validateWeeklyAvailability } from "@planflow/shared";
 import type { WeeklyAvailabilityRuleInput } from "@planflow/shared";
 
-import type { CreatedPlanResponse } from "@/lib/client/planCreation";
+import {
+  generatePlanTasks,
+  schedulePlan,
+  type CreatedPlanResponse,
+  type GeneratedTask
+} from "@/lib/client/planCreation";
 import type {
   DashboardBusySlot,
   DashboardGeneration,
   DashboardSession,
-  DashboardTask,
   SessionReviewPayload
 } from "@/lib/client/planDashboard";
 import {
@@ -66,6 +70,7 @@ interface WizardState {
   planInfo: PlanInfo;
   availability: DailyAvailability[];
   planId: string | null;
+  tasks: GeneratedTask[] | null;
   generation: DashboardGeneration | null;
   selectedSessionId: string | null;
 }
@@ -113,6 +118,7 @@ export function PlanWizard() {
     planInfo: initialPlanInfo,
     availability: initialAvailability,
     planId: null,
+    tasks: null,
     generation: null,
     selectedSessionId: null
   });
@@ -132,7 +138,7 @@ export function PlanWizard() {
         : currentStep === "busy-sync"
           ? !!state.planId
           : currentStep === "task-confirm"
-            ? !!state.generation
+            ? !!state.tasks && state.tasks.length > 0
             : true;
 
   const setPlanInfo = useCallback((patch: Partial<PlanInfo>) => {
@@ -148,6 +154,10 @@ export function PlanWizard() {
     },
     []
   );
+
+  const setTasks = useCallback((tasks: GeneratedTask[]) => {
+    setState((prev) => ({ ...prev, tasks }));
+  }, []);
 
   function showError(text: string) {
     setMessage({ type: "error", text });
@@ -189,22 +199,44 @@ export function PlanWizard() {
     }
   }
 
-  async function handleGenerateSchedule() {
+  async function handleGenerateTasks() {
     if (!state.planId) return;
 
     setLoading(true);
     setMessage(null);
 
     try {
-      const generation = await postJson<DashboardGeneration>(
-        `/api/plans/${state.planId}/generate`,
-        undefined
-      );
-      setState((prev) => ({ ...prev, generation }));
-      showInfo("排程生成成功，请确认任务拆解。");
+      const result = await generatePlanTasks(state.planId);
+      setState((prev) => ({ ...prev, tasks: result.tasks }));
+      showInfo("AI 任务拆解完成，请确认后生成排程。");
       setCurrentStep("task-confirm");
     } catch (error) {
-      showError(error instanceof Error ? error.message : "生成排程失败");
+      showError(error instanceof Error ? error.message : "任务拆解失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSchedule() {
+    if (!state.planId || !state.tasks) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const result = await schedulePlan(state.planId);
+      const generation: DashboardGeneration = {
+        planId: result.planId,
+        tasks: result.tasks,
+        sessions: result.sessions,
+        busySlots: result.busySlots,
+        warnings: result.warnings
+      };
+      setState((prev) => ({ ...prev, generation }));
+      showInfo("排程生成成功，进入日历看板。");
+      setCurrentStep("calendar-board");
+    } catch (error) {
+      showError(error instanceof Error ? error.message : "排程生成失败");
     } finally {
       setLoading(false);
     }
@@ -213,6 +245,16 @@ export function PlanWizard() {
   function goNext() {
     if (currentStep === "availability") {
       void handleCreatePlan();
+      return;
+    }
+
+    if (currentStep === "busy-sync") {
+      void handleGenerateTasks();
+      return;
+    }
+
+    if (currentStep === "task-confirm") {
+      void handleSchedule();
       return;
     }
 
@@ -270,15 +312,18 @@ export function PlanWizard() {
             <StepBusySync
               availability={state.availability}
               planId={state.planId}
-              onSync={() => handleGenerateSchedule()}
-              onSkip={() => handleGenerateSchedule()}
+              onContinue={() => setCurrentStep("task-confirm")}
             />
           ) : null}
 
-          {currentStep === "task-confirm" && state.generation ? (
+          {currentStep === "task-confirm" ? (
             <StepTaskConfirm
-              generation={state.generation}
+              planId={state.planId}
               planInfo={state.planInfo}
+              tasks={state.tasks}
+              loading={loading}
+              onTasksLoaded={setTasks}
+              onSchedule={() => void handleSchedule()}
             />
           ) : null}
 
@@ -438,6 +483,7 @@ function WizardFooter({
   const currentIndex = stepOrder.indexOf(currentStep);
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === stepOrder.length - 1;
+  const nextLabel = currentStep === "task-confirm" ? "生成排程" : "下一步";
 
   return (
     <div className="mt-6 flex items-center justify-between">
@@ -464,7 +510,7 @@ function WizardFooter({
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
-              下一步
+              {nextLabel}
               <ChevronRight className="h-4 w-4" />
             </>
           )}
@@ -680,13 +726,11 @@ function StepAvailability({
 function StepBusySync({
   availability,
   planId,
-  onSync,
-  onSkip
+  onContinue
 }: {
   availability: DailyAvailability[];
   planId: string | null;
-  onSync: () => void;
-  onSkip: () => void;
+  onContinue: () => void;
 }) {
   const [slots, setSlots] = useState<DashboardBusySlot[]>([]);
   const [loading, setLoading] = useState(false);
@@ -701,9 +745,8 @@ function StepBusySync({
         busySlots?: DashboardBusySlot[];
       };
       setSlots(data.busySlots ?? []);
-      onSync();
     } catch {
-      onSync();
+      // 同步失败时仍使用示例忙碌时间，不影响后续流程。
     } finally {
       setLoading(false);
     }
@@ -789,7 +832,7 @@ function StepBusySync({
             className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-primary"
             disabled={loading || !planId}
             type="button"
-            onClick={() => onSkip()}
+            onClick={() => onContinue()}
           >
             跳过同步
           </button>
@@ -805,6 +848,15 @@ function StepBusySync({
               <RotateCcw className="h-4 w-4" />
             )}
             重新同步
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+            disabled={loading || !planId}
+            type="button"
+            onClick={() => onContinue()}
+          >
+            下一步
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -845,17 +897,48 @@ function BusyRow({ weekday, text }: { weekday: string; text: string }) {
 }
 
 function StepTaskConfirm({
-  generation,
-  planInfo
+  planId,
+  planInfo,
+  tasks,
+  loading,
+  onTasksLoaded,
+  onSchedule
 }: {
-  generation: DashboardGeneration;
+  planId: string | null;
   planInfo: PlanInfo;
+  tasks: GeneratedTask[] | null;
+  loading: boolean;
+  onTasksLoaded: (tasks: GeneratedTask[]) => void;
+  onSchedule: () => void;
 }) {
+  const [error, setError] = useState<string | null>(null);
   const totalHours = Number(planInfo.totalHours) || 0;
-  const groupedByPhase = useMemo(() => {
-    const groups = new Map<string, DashboardTask[]>();
 
-    for (const task of generation.tasks) {
+  useEffect(() => {
+    if (!planId || tasks) return;
+
+    let cancelled = false;
+    setError(null);
+
+    generatePlanTasks(planId)
+      .then((result) => {
+        if (!cancelled) onTasksLoaded(result.tasks);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "任务拆解失败");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [planId, tasks, onTasksLoaded]);
+
+  const groupedByPhase = useMemo(() => {
+    const groups = new Map<string, GeneratedTask[]>();
+
+    for (const task of tasks ?? []) {
       const phase = task.phase || "其他";
       const list = groups.get(phase) ?? [];
       list.push(task);
@@ -863,7 +946,17 @@ function StepTaskConfirm({
     }
 
     return Array.from(groups.entries());
-  }, [generation.tasks]);
+  }, [tasks]);
+
+  if (!tasks) {
+    return (
+      <section className="flex flex-col items-center justify-center gap-4 py-16 text-slate-500">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p>AI 正在拆解学习任务...</p>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-5">
@@ -881,6 +974,12 @@ function StepTaskConfirm({
         </div>
       </div>
 
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-lg border border-slate-200">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
@@ -892,13 +991,13 @@ function StepTaskConfirm({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {groupedByPhase.map(([phase, tasks]) =>
-              tasks.map((task, index) => (
+            {groupedByPhase.map(([phase, phaseTasks]) =>
+              phaseTasks.map((task, index) => (
                 <tr key={task.id} className="bg-white hover:bg-slate-50/50">
                   {index === 0 ? (
                     <td
                       className="border-r border-slate-100 bg-slate-50 px-4 py-3 align-top font-semibold text-slate-700"
-                      rowSpan={tasks.length}
+                      rowSpan={phaseTasks.length}
                     >
                       {phase}
                     </td>
@@ -921,18 +1020,21 @@ function StepTaskConfirm({
         </table>
       </div>
 
-      {generation.warnings.length > 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <div className="mb-2 text-sm font-semibold text-amber-900">注意</div>
-          <div className="space-y-1 text-sm text-amber-800">
-            {generation.warnings.map((warning, index) => (
-              <p key={`${warning.code}-${warning.taskId ?? "plan"}-${index}`}>
-                {warning.message}
-              </p>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <div className="flex justify-end">
+        <button
+          className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={loading || tasks.length === 0}
+          type="button"
+          onClick={onSchedule}
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          生成排程
+        </button>
+      </div>
     </section>
   );
 }

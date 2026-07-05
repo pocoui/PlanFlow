@@ -10,7 +10,10 @@ import {
   type SessionReviewInput
 } from "../review/reviewEngine";
 import { generateLearningTasks } from "./aiPlanningService";
-import type { GeneratedLearningTask } from "./aiPlanningService";
+import type {
+  GeneratedLearningTask,
+  GeneratedTaskValidationWarning
+} from "./aiPlanningService";
 import {
   calculateRealAvailability,
   validateWeeklyAvailability
@@ -92,6 +95,12 @@ export interface GeneratePlanResult {
   warnings: SchedulerWarning[];
 }
 
+export interface GeneratePlanTasksResult {
+  planId: string;
+  tasks: LearningTaskRecord[];
+  warnings: GeneratedTaskValidationWarning[];
+}
+
 export interface PlanDetails extends PlanRecord {
   progress: {
     totalTasks: number;
@@ -125,6 +134,8 @@ export interface PlanRepository {
   createPlan(input: CreatePlanRepositoryInput): Promise<PlanRecord>;
   getPlan(planId: string): Promise<PlanRecord | null>;
   savePlanGeneration(input: SavePlanGenerationInput): Promise<GeneratePlanResult>;
+  savePlanTasks(input: SavePlanTasksInput): Promise<LearningTaskRecord[]>;
+  savePlanSchedule(input: SavePlanScheduleInput): Promise<GeneratePlanResult>;
   updateTaskStatus(taskId: string, status: TaskStatus): Promise<LearningTaskRecord>;
   updateSessionStatus(
     sessionId: string,
@@ -147,6 +158,19 @@ interface CreatePlanRepositoryInput
 interface SavePlanGenerationInput {
   planId: string;
   tasks: GeneratedLearningTask[];
+  sessions: ScheduledSession[];
+  busySlots: BusySlot[];
+  warnings: SchedulerWarning[];
+}
+
+interface SavePlanTasksInput {
+  planId: string;
+  tasks: GeneratedLearningTask[];
+  warnings: GeneratedTaskValidationWarning[];
+}
+
+interface SavePlanScheduleInput {
+  planId: string;
   sessions: ScheduledSession[];
   busySlots: BusySlot[];
   warnings: SchedulerWarning[];
@@ -210,15 +234,51 @@ export async function generatePlan(
   planId: string,
   dependencies: PlanServiceDependencies = {}
 ): Promise<GeneratePlanResult> {
+  await generatePlanTasks(planId, dependencies);
+
+  return schedulePlan(planId, dependencies);
+}
+
+export async function generatePlanTasks(
+  planId: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<GeneratePlanTasksResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
-  const calendarProvider =
-    dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
   const plan = await requirePlan(planId, repository);
-  const tasks = await generateLearningTasks({
+  const generation = await generateLearningTasks({
     title: plan.title,
     goal: plan.goal,
     totalMinutes: plan.totalMinutes
   });
+  const tasks = await repository.savePlanTasks({
+    planId,
+    tasks: generation.tasks,
+    warnings: generation.warnings
+  });
+
+  return {
+    planId,
+    tasks,
+    warnings: generation.warnings
+  };
+}
+
+export async function schedulePlan(
+  planId: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<GeneratePlanResult> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const calendarProvider =
+    dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
+  const plan = await requirePlan(planId, repository);
+
+  if (plan.tasks.length === 0) {
+    throw new PlanServiceError(
+      "CONFLICT",
+      "Plan has no tasks to schedule. Generate tasks first."
+    );
+  }
+
   const busySlots = await calendarProvider.getBusySlots({
     startAt: plan.startDate,
     endAt: endOfUtcDay(plan.deadline)
@@ -231,7 +291,7 @@ export async function generatePlan(
     bufferMinutes: plan.rescheduleBufferMinutes
   });
   const scheduled = scheduleTasks({
-    tasks: tasks.map((task) => ({
+    tasks: plan.tasks.map((task) => ({
       id: task.id,
       title: task.title,
       estimatedMinutes: task.estimatedMinutes,
@@ -240,9 +300,8 @@ export async function generatePlan(
     availabilitySlots: realAvailability
   });
 
-  return repository.savePlanGeneration({
+  return repository.savePlanSchedule({
     planId,
-    tasks,
     sessions: scheduled.sessions,
     busySlots,
     warnings: scheduled.warnings
@@ -463,6 +522,64 @@ export function createInMemoryPlanRepository(): PlanRepository {
         warnings: input.warnings
       };
     },
+    async savePlanTasks(input) {
+      const plan = plans.get(input.planId);
+
+      if (!plan) {
+        throw new PlanServiceError("NOT_FOUND", "Plan not found.");
+      }
+
+      const tasks = input.tasks.map((task) => ({
+        ...task,
+        id: task.id,
+        planId: input.planId,
+        status: "not_started" as TaskStatus
+      }));
+
+      plan.tasks = tasks;
+      plan.sessions = [];
+      plan.busySlots = [];
+      plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
+      plans.set(input.planId, clonePlan(plan));
+
+      return tasks.map((task) => ({ ...task, acceptanceCriteria: [...task.acceptanceCriteria] }));
+    },
+    async savePlanSchedule(input) {
+      const plan = plans.get(input.planId);
+
+      if (!plan) {
+        throw new PlanServiceError("NOT_FOUND", "Plan not found.");
+      }
+
+      const sessions = input.sessions.map((session) => ({
+        ...session,
+        id: nextId("session"),
+        planId: input.planId,
+        status: session.status
+      }));
+      const busySlots = input.busySlots.map((slot) => ({
+        ...slot,
+        id: slot.id,
+        planId: input.planId
+      }));
+
+      plan.status = "generated";
+      plan.sessions = sessions;
+      plan.busySlots = busySlots;
+      plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
+      plans.set(input.planId, clonePlan(plan));
+
+      return {
+        planId: input.planId,
+        tasks: plan.tasks.map((task) => ({
+          ...task,
+          acceptanceCriteria: [...task.acceptanceCriteria]
+        })),
+        sessions,
+        busySlots,
+        warnings: input.warnings
+      };
+    },
     async updateTaskStatus(taskId, status) {
       for (const plan of plans.values()) {
         const task = plan.tasks.find((item) => item.id === taskId);
@@ -659,6 +776,95 @@ export function createPrismaPlanRepository(): PlanRepository {
       return {
         planId: input.planId,
         tasks: result.tasks.map(mapPrismaTask),
+        sessions: result.sessions.map(mapPrismaSession),
+        busySlots: result.busySlots.map(mapPrismaBusySlot),
+        warnings: input.warnings
+      };
+    },
+    async savePlanTasks(input) {
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.learningTask.deleteMany({ where: { planId: input.planId } });
+        await tx.scheduledSession.deleteMany({ where: { planId: input.planId } });
+        await tx.busySlot.deleteMany({ where: { planId: input.planId } });
+
+        const tasks = await Promise.all(
+          input.tasks.map((task) =>
+            tx.learningTask.create({
+              data: {
+                id: task.id,
+                planId: input.planId,
+                phase: task.phase,
+                title: task.title,
+                description: task.description,
+                estimatedMinutes: task.estimatedMinutes,
+                priority: task.priority,
+                acceptanceCriteria: task.acceptanceCriteria,
+                orderIndex: task.orderIndex
+              }
+            })
+          )
+        );
+
+        return { tasks };
+      });
+
+      return result.tasks.map(mapPrismaTask);
+    },
+    async savePlanSchedule(input) {
+      const plan = await prisma.learningPlan.findUnique({
+        where: { id: input.planId },
+        include: planInclude
+      });
+
+      if (!plan) {
+        throw new PlanServiceError("NOT_FOUND", "Plan not found.");
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.scheduledSession.deleteMany({ where: { planId: input.planId } });
+        await tx.busySlot.deleteMany({ where: { planId: input.planId } });
+
+        const sessions = await Promise.all(
+          input.sessions.map((session) =>
+            tx.scheduledSession.create({
+              data: {
+                planId: input.planId,
+                taskId: session.taskId,
+                startAt: session.startAt,
+                endAt: session.endAt,
+                durationMinutes: session.durationMinutes,
+                status: session.status
+              }
+            })
+          )
+        );
+        const busySlots = await Promise.all(
+          input.busySlots.map((slot) =>
+            tx.busySlot.create({
+              data: {
+                id: slot.id,
+                planId: input.planId,
+                source: slot.source,
+                externalEventId: slot.externalEventId,
+                title: slot.title,
+                startAt: slot.startAt,
+                endAt: slot.endAt
+              }
+            })
+          )
+        );
+
+        await tx.learningPlan.update({
+          where: { id: input.planId },
+          data: { status: "generated" }
+        });
+
+        return { sessions, busySlots };
+      });
+
+      return {
+        planId: input.planId,
+        tasks: plan.tasks.map(mapPrismaTask),
         sessions: result.sessions.map(mapPrismaSession),
         busySlots: result.busySlots.map(mapPrismaBusySlot),
         warnings: input.warnings

@@ -5,6 +5,8 @@ import {
   createInMemoryPlanRepository,
   createPlan,
   generatePlan,
+  generatePlanTasks,
+  schedulePlan,
   getBusySlotsForPlan,
   getPlan,
   submitSessionReview,
@@ -73,12 +75,75 @@ describe("planService", () => {
     const result = await generatePlan(plan.id, { repository });
 
     expect(result.planId).toBe(plan.id);
-    expect(result.tasks).toHaveLength(3);
+    expect(result.tasks).toHaveLength(9);
     expect(result.busySlots.length).toBeGreaterThan(0);
     expect(result.sessions.length).toBeGreaterThan(0);
     expect(result.sessions.every((session) => session.status === "scheduled")).toBe(
       true
     );
+  });
+
+  it("generates tasks without scheduling", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createPlan(
+      validCreatePlanInput({
+        totalMinutes: 120,
+        startDate: "2026-07-06",
+        deadline: "2026-07-07",
+        availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
+      }),
+      { repository }
+    );
+
+    const result = await generatePlanTasks(plan.id, { repository });
+
+    expect(result.planId).toBe(plan.id);
+    expect(result.tasks).toHaveLength(9);
+
+    const stored = await getPlan(plan.id, { repository });
+    expect(stored.tasks).toHaveLength(9);
+    expect(stored.sessions).toHaveLength(0);
+    expect(stored.busySlots).toHaveLength(0);
+  });
+
+  it("schedules existing tasks into sessions", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createPlan(
+      validCreatePlanInput({
+        totalMinutes: 120,
+        startDate: "2026-07-06",
+        deadline: "2026-07-07",
+        availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
+      }),
+      { repository }
+    );
+    await generatePlanTasks(plan.id, { repository });
+
+    const result = await schedulePlan(plan.id, { repository });
+
+    expect(result.planId).toBe(plan.id);
+    expect(result.tasks).toHaveLength(9);
+    expect(result.sessions.length).toBeGreaterThan(0);
+    expect(result.sessions.every((session) => session.status === "scheduled")).toBe(
+      true
+    );
+  });
+
+  it("rejects scheduling when plan has no tasks", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createPlan(
+      validCreatePlanInput({
+        totalMinutes: 120,
+        startDate: "2026-07-06",
+        deadline: "2026-07-07",
+        availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
+      }),
+      { repository }
+    );
+
+    await expect(schedulePlan(plan.id, { repository })).rejects.toMatchObject({
+      code: "CONFLICT"
+    });
   });
 
   it("returns plan details with availability, tasks, sessions, and progress", async () => {
@@ -98,9 +163,9 @@ describe("planService", () => {
 
     expect(details.id).toBe(plan.id);
     expect(details.availability).toHaveLength(1);
-    expect(details.tasks).toHaveLength(3);
+    expect(details.tasks).toHaveLength(9);
     expect(details.sessions.length).toBeGreaterThan(0);
-    expect(details.progress.totalTasks).toBe(3);
+    expect(details.progress.totalTasks).toBe(9);
   });
 
   it("updates task and session statuses", async () => {

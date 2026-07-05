@@ -28,17 +28,19 @@ export interface CreatedPlanResponse {
   createdAt?: string;
 }
 
+export interface GeneratedTask {
+  id: string;
+  title: string;
+  phase?: string;
+  estimatedMinutes: number;
+  priority?: number;
+  status?: string;
+  acceptanceCriteria?: string[];
+}
+
 export interface GeneratePlanResponse {
   planId: string;
-  tasks: Array<{
-    id: string;
-    title: string;
-    phase?: string;
-    estimatedMinutes: number;
-    priority?: number;
-    status?: string;
-    acceptanceCriteria?: string[];
-  }>;
+  tasks: GeneratedTask[];
   sessions: Array<{
     id: string;
     taskId: string;
@@ -59,6 +61,17 @@ export interface GeneratePlanResponse {
     message: string;
     taskId?: string;
     remainingMinutes?: number;
+  }>;
+}
+
+export interface GenerateTasksResponse {
+  planId: string;
+  tasks: GeneratedTask[];
+  warnings: Array<{
+    code: string;
+    message: string;
+    targetTotalMinutes?: number;
+    generatedTotalMinutes?: number;
   }>;
 }
 
@@ -164,6 +177,28 @@ export async function createAndGeneratePlan(
   );
 
   return { plan, generation };
+}
+
+export async function generatePlanTasks(
+  planId: string,
+  fetcher: PlanCreationFetcher = fetch
+): Promise<GenerateTasksResponse> {
+  return postJson<GenerateTasksResponse>(
+    `/api/plans/${planId}/tasks/generate`,
+    undefined,
+    fetcher
+  );
+}
+
+export async function schedulePlan(
+  planId: string,
+  fetcher: PlanCreationFetcher = fetch
+): Promise<GeneratePlanResponse> {
+  return postJson<GeneratePlanResponse>(
+    `/api/plans/${planId}/schedule`,
+    undefined,
+    fetcher
+  );
 }
 
 async function postJson<T>(
