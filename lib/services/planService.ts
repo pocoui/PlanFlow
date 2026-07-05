@@ -133,6 +133,7 @@ export interface BusySlotsForPlanResult {
 export interface PlanRepository {
   createPlan(input: CreatePlanRepositoryInput): Promise<PlanRecord>;
   getPlan(planId: string): Promise<PlanRecord | null>;
+  listPlans(): Promise<PlanRecord[]>;
   savePlanGeneration(input: SavePlanGenerationInput): Promise<GeneratePlanResult>;
   savePlanTasks(input: SavePlanTasksInput): Promise<LearningTaskRecord[]>;
   savePlanSchedule(input: SavePlanScheduleInput): Promise<GeneratePlanResult>;
@@ -482,6 +483,9 @@ export function createInMemoryPlanRepository(): PlanRepository {
 
       return plan ? clonePlan(plan) : null;
     },
+    async listPlans() {
+      return Array.from(plans.values()).map(clonePlan);
+    },
     async savePlanGeneration(input) {
       const plan = plans.get(input.planId);
 
@@ -711,6 +715,14 @@ export function createPrismaPlanRepository(): PlanRepository {
       });
 
       return plan ? mapPrismaPlan(plan) : null;
+    },
+    async listPlans() {
+      const plans = await prisma.learningPlan.findMany({
+        include: planInclude,
+        orderBy: { createdAt: "desc" }
+      });
+
+      return plans.map(mapPrismaPlan);
     },
     async savePlanGeneration(input) {
       const result = await prisma.$transaction(async (tx) => {

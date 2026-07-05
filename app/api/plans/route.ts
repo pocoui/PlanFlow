@@ -3,6 +3,25 @@ import { NextResponse } from "next/server";
 import { createPlan, PlanServiceError } from "@/lib/services/planService";
 import { getRepository } from "@/lib/server/repository";
 
+export async function GET() {
+  try {
+    const repository = getRepository();
+    const plans = await repository.listPlans();
+
+    return NextResponse.json(
+      plans.map((plan) => ({
+        id: plan.id,
+        title: plan.title,
+        goal: plan.goal,
+        status: plan.status,
+        createdAt: plan.createdAt
+      }))
+    );
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
