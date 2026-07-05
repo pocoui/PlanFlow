@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Save } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 // 设置页面——配置 AI Agent API。
@@ -24,6 +24,13 @@ interface FormState {
   apiKey: string;
 }
 
+interface TestResult {
+  testing: boolean;
+  success: boolean | null;
+  message: string;
+  latencyMs: number | null;
+}
+
 const PRESET_MODELS = [
   { label: "OpenAI (GPT-4o)", baseUrl: "https://api.openai.com/v1", model: "gpt-4o" },
   { label: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
@@ -45,6 +52,12 @@ export default function SettingsPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [testResult, setTestResult] = useState<TestResult>({
+    testing: false,
+    success: null,
+    message: "",
+    latencyMs: null
+  });
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -115,6 +128,73 @@ export default function SettingsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    setTestResult({ testing: true, success: null, message: "", latencyMs: null });
+
+    try {
+      // 先保存当前配置
+      const savePayload: Record<string, unknown> = {
+        provider: form.provider
+      };
+
+      if (form.provider === "openai_compatible") {
+        savePayload.openai = {
+          baseUrl: form.baseUrl,
+          model: form.model,
+          ...(form.apiKey ? { apiKey: form.apiKey } : {})
+        };
+      }
+
+      await fetch("/api/settings/ai", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(savePayload)
+      });
+
+      // 发起测试请求，apiKey 留空时用 useSavedKey 让后端取已保存的值
+      const response = await fetch("/api/settings/ai/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: form.baseUrl,
+          model: form.model,
+          apiKey: form.apiKey || undefined,
+          useSavedKey: !form.apiKey
+        })
+      });
+
+      const result = (await response.json()) as {
+        success: boolean;
+        message?: string;
+        error?: string;
+        latencyMs?: number;
+      };
+
+      if (result.success) {
+        setTestResult({
+          testing: false,
+          success: true,
+          message: result.message ?? "连接成功",
+          latencyMs: result.latencyMs ?? null
+        });
+      } else {
+        setTestResult({
+          testing: false,
+          success: false,
+          message: result.error ?? "连接失败",
+          latencyMs: null
+        });
+      }
+    } catch (error) {
+      setTestResult({
+        testing: false,
+        success: false,
+        message: error instanceof Error ? error.message : "测试请求失败",
+        latencyMs: null
+      });
     }
   }
 
@@ -253,6 +333,53 @@ export default function SettingsPage() {
                   <p className="mt-1 text-xs text-slate-500">
                     当前已配置：{apiKeyPreview}（留空则保持不变）
                   </p>
+                ) : null}
+              </div>
+
+              {/* 测试连接 */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">连接测试</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      验证 API 配置是否正确，发送一条简短消息检查连通性
+                    </p>
+                  </div>
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-primary hover:text-primary disabled:opacity-60"
+                    disabled={testResult.testing || !form.baseUrl || !form.model || (!form.apiKey && !apiKeyPreview)}
+                    type="button"
+                    onClick={() => handleTest()}
+                  >
+                    {testResult.testing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        测试中...
+                      </>
+                    ) : (
+                      "测试连接"
+                    )}
+                  </button>
+                </div>
+
+                {testResult.success !== null ? (
+                  <div
+                    className={`mt-3 rounded-lg border p-3 text-sm ${
+                      testResult.success
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-red-200 bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {testResult.success ? (
+                      <CheckCircle2 className="mr-1 inline h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="mr-1 inline h-4 w-4" />
+                    )}
+                    {testResult.success
+                      ? `连接成功${testResult.latencyMs ? `（耗时 ${testResult.latencyMs}ms）` : ""}：${testResult.message}`
+                      : `连接失败：${testResult.message}`
+                    }
+                  </div>
                 ) : null}
               </div>
             </section>
