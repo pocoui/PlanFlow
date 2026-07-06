@@ -75,16 +75,20 @@ export async function generateLearningTasks(
   provider: AiPlanningProvider = new MockAiPlanningProvider()
 ): Promise<GenerateLearningTasksResult> {
   const activeProvider = provider;
+  console.log("[aiPlanning.generateLearningTasks] 使用 Provider:", activeProvider.constructor.name, "输入 totalMinutes:", input.totalMinutes);
   const tasks = await activeProvider.generateLearningTasks(input);
+  console.log("[aiPlanning.generateLearningTasks] Provider 返回 tasks:", tasks.length);
   const validation = validateGeneratedTasks({
     targetTotalMinutes: input.totalMinutes,
     tasks
   });
 
   if (!validation.valid) {
+    console.error("[aiPlanning.generateLearningTasks] 校验失败");
     throw new Error("Generated learning tasks are invalid.");
   }
 
+  console.log("[aiPlanning.generateLearningTasks] 校验通过 warnings:", validation.warnings.length);
   return {
     tasks,
     warnings: validation.warnings
@@ -96,14 +100,17 @@ export function createProviderFromConfig(config: {
   provider: "mock" | "openai_compatible";
   openai: OpenAiCompatibleConfig;
 }): AiPlanningProvider {
+  console.log("[aiPlanning.createProviderFromConfig] provider:", config.provider, "baseUrl:", config.openai.baseUrl || "(empty)", "apiKey:", config.openai.apiKey ? "***" : "(empty)");
   if (
     config.provider === "openai_compatible" &&
     config.openai.baseUrl &&
     config.openai.apiKey
   ) {
+    console.log("[aiPlanning.createProviderFromConfig] → OpenAiCompatibleProvider");
     return new OpenAiCompatibleProvider(config.openai);
   }
 
+  console.log("[aiPlanning.createProviderFromConfig] → MockAiPlanningProvider (fallback)");
   return new MockAiPlanningProvider();
 }
 

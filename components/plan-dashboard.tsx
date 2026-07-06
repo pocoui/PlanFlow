@@ -73,7 +73,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
       setPlan(result);
       setViewState("ready");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to load plan.");
+      setMessage(error instanceof Error ? error.message : "加载计划失败。");
       setViewState("error");
     }
   }, [planId]);
@@ -134,7 +134,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
             }
           : prev
       );
-      setMessage("Task marked completed.");
+      setMessage("任务已标记完成。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Request failed.");
     }
@@ -157,7 +157,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
             }
           : prev
       );
-      setMessage("Session marked completed.");
+      setMessage("日程已标记完成。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Request failed.");
     }
@@ -184,7 +184,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
             }
           : prev
       );
-      setMessage("Review submitted and remaining work rescheduled.");
+      setMessage("复盘已提交，剩余任务已顺延。");
       setReviewSessionId(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Request failed.");
@@ -203,13 +203,13 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
         <AlertCircle className="h-8 w-8 text-red-600" />
-        <p className="text-sm text-red-700">{message || "Plan not found."}</p>
+        <p className="text-sm text-red-700">{message || "计划未找到。"}</p>
         <button
           className="small-action"
           type="button"
           onClick={loadPlan}
         >
-          Retry
+          重试
         </button>
       </div>
     );
@@ -226,9 +226,9 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
         <p className="text-sm text-slate-600">{plan.goal}</p>
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
           <span>{formatDate(plan.startDate)} - {formatDate(plan.deadline)}</span>
-          <span>{plan.totalMinutes} min total</span>
+          <span>共 {plan.totalMinutes} 分钟</span>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-            {plan.status}
+            {statusLabel(plan.status)}
           </span>
         </div>
       </header>
@@ -240,10 +240,10 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
       ) : null}
 
       <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Metric label="Tasks" value={`${plan.progress.completedTasks}/${plan.progress.totalTasks}`} />
-        <Metric label="Sessions" value={`${plan.progress.completedSessions}/${plan.progress.totalSessions}`} />
-        <Metric label="Scheduled" value={`${summary.scheduledMinutes} min`} />
-        <Metric label="Busy slots" value={`${summary.busySlots}`} />
+        <Metric label="任务" value={`${plan.progress.completedTasks}/${plan.progress.totalTasks}`} />
+        <Metric label="日程" value={`${plan.progress.completedSessions}/${plan.progress.totalSessions}`} />
+        <Metric label="已排程" value={`${summary.scheduledMinutes} 分钟`} />
+        <Metric label="忙闲时段" value={`${summary.busySlots}`} />
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -252,7 +252,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
           href={buildCalendarExportUrl(planId)}
         >
           <Download className="h-4 w-4" />
-          Export .ics
+          导出 .ics
         </a>
         <button
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-primary"
@@ -260,18 +260,18 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
           onClick={loadPlan}
         >
           <RotateCcw className="h-4 w-4" />
-          Refresh
+          刷新
         </button>
       </div>
 
       <section className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Sparkles className="h-5 w-5 text-primary" />
-          Today&apos;s schedule
+          今日日程
         </h2>
         {todaySessions.length === 0 && todayBusySlots.length === 0 ? (
           <div className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-slate-500">
-            No sessions or busy slots today.
+            今天没有日程或忙闲时段。
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -279,7 +279,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
               <SessionCard
                 key={session.id}
                 session={session}
-                taskTitle={taskTitleById.get(session.taskId) ?? "Learning session"}
+                taskTitle={taskTitleById.get(session.taskId) ?? "学习日程"}
                 onComplete={() => completeSession(session.id)}
                 onReview={() => setReviewSessionId(session.id)}
               />
@@ -294,7 +294,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
       <section className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <CalendarClock className="h-5 w-5 text-primary" />
-          Week calendar
+          周视图
         </h2>
         {groupedSessions.map((group) => (
           <div
@@ -305,7 +305,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
               {formatDate(group.date)}
               {group.date === today ? (
                 <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
-                  Today
+                  今天
                 </span>
               ) : null}
             </div>
@@ -314,7 +314,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
                 <SessionCard
                   key={session.id}
                   session={session}
-                  taskTitle={taskTitleById.get(session.taskId) ?? "Learning session"}
+                  taskTitle={taskTitleById.get(session.taskId) ?? "学习日程"}
                   onComplete={() => completeSession(session.id)}
                   onReview={() => setReviewSessionId(session.id)}
                 />
@@ -334,7 +334,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
       <section className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <CheckCircle2 className="h-5 w-5 text-primary" />
-          Task list
+          任务列表
         </h2>
         {tasks.map((task) => (
           <div className="rounded-md border border-border bg-white p-3" key={task.id}>
@@ -346,7 +346,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
                   {task.phase ? ` - ${task.phase}` : ""}
                   {" - "}
                   <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
-                    {task.status ?? "not_started"}
+                    {taskStatusLabel(task.status ?? "not_started")}
                   </span>
                 </div>
               </div>
@@ -356,7 +356,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
                   type="button"
                   onClick={() => completeTask(task.id)}
                 >
-                  Complete
+                  完成
                 </button>
               ) : null}
             </div>
@@ -366,7 +366,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
 
       {generation.warnings.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold">Warnings</h2>
+          <h2 className="text-lg font-semibold">警告</h2>
           {generation.warnings.map((warning, index) => (
             <div
               className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
@@ -429,17 +429,17 @@ function SessionCard({
                 : "bg-slate-100 text-slate-600"
           }`}
         >
-          {session.status}
+          {sessionStatusLabel(session.status)}
         </span>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         {session.status === "scheduled" ? (
           <>
             <button className="small-action" type="button" onClick={onComplete}>
-              Complete
+              完成
             </button>
             <button className="small-action" type="button" onClick={onReview}>
-              Review
+              复盘
             </button>
           </>
         ) : null}
@@ -456,7 +456,7 @@ function BusySlotCard({ slot }: { slot: DashboardBusySlot }) {
         <Clock className="h-3 w-3" />
         {formatTime(slot.startAt)} - {formatTime(slot.endAt)}
         <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
-          busy
+          忙碌
         </span>
       </div>
     </div>
@@ -516,7 +516,7 @@ function ReviewDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Session Review</h3>
+          <h3 className="text-lg font-semibold">日程复盘</h3>
           <button
             className="rounded-md p-1 text-slate-500 transition hover:text-slate-800"
             type="button"
@@ -526,11 +526,11 @@ function ReviewDialog({
           </button>
         </div>
         <p className="mb-4 text-sm text-slate-600">
-          Session: {sessionId} ({durationMinutes} min scheduled)
+          日程：{sessionId}（已排 {durationMinutes} 分钟）
         </p>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-slate-700">Result</span>
+            <span className="text-sm font-medium text-slate-700">完成情况</span>
             <select
               className="input"
               value={result}
@@ -538,15 +538,15 @@ function ReviewDialog({
                 setResult(e.target.value as SessionReviewPayload["result"])
               }
             >
-              <option value="completed">Completed</option>
-              <option value="partial">Partial</option>
-              <option value="not_completed">Not completed</option>
-              <option value="skipped">Skipped</option>
+              <option value="completed">已完成</option>
+              <option value="partial">部分完成</option>
+              <option value="not_completed">未完成</option>
+              <option value="skipped">跳过</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium text-slate-700">
-              Actual minutes
+              实际学习时长（分钟）
             </span>
             <input
               className="input"
@@ -559,7 +559,7 @@ function ReviewDialog({
           {result !== "completed" ? (
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium text-slate-700">
-                Remaining minutes
+                剩余时长（分钟）
               </span>
               <input
                 className="input"
@@ -572,7 +572,7 @@ function ReviewDialog({
           ) : null}
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium text-slate-700">
-              Reason (optional)
+              原因（可选）
             </span>
             <textarea
               className="input min-h-16 resize-y"
@@ -586,7 +586,7 @@ function ReviewDialog({
               type="button"
               onClick={onClose}
             >
-              Cancel
+              取消
             </button>
             <button
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primaryForeground transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -594,7 +594,7 @@ function ReviewDialog({
               type="submit"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Submit review
+              提交复盘
             </button>
           </div>
         </form>
@@ -604,13 +604,46 @@ function ReviewDialog({
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium"
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "short"
   }).format(new Date(value));
 }
 
 function formatTime(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    timeStyle: "short"
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit"
   }).format(new Date(value));
+}
+
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    draft: "草稿",
+    generated: "已生成",
+    archived: "已归档"
+  };
+  return labels[status] ?? status;
+}
+
+function taskStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    not_started: "未开始",
+    in_progress: "进行中",
+    completed: "已完成",
+    delayed: "已延期"
+  };
+  return labels[status] ?? status;
+}
+
+function sessionStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    scheduled: "已排程",
+    completed: "已完成",
+    missed: "已错过",
+    rescheduled: "已顺延",
+    conflicted: "冲突"
+  };
+  return labels[status] ?? status;
 }

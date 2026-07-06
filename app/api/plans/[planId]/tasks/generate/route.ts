@@ -13,6 +13,7 @@ interface RouteContext {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
+    console.log("[tasks/generate] 收到请求 planId:", planId);
 
     // 优先从请求体读取 AI 配置（前端 localStorage），否则用环境变量兜底
     let aiConfig = getAiConfigFromEnv();
@@ -24,14 +25,17 @@ export async function POST(request: Request, context: RouteContext) {
     } catch {
       // 请求体为空或不合法，使用环境变量兜底
     }
+    console.log("[tasks/generate] AI 配置 provider:", aiConfig.provider, "openai.baseUrl:", aiConfig.openai.baseUrl || "(empty)", "model:", aiConfig.openai.model || "(empty)", "apiKey:", aiConfig.openai.apiKey ? "***" : "(empty)");
 
     const result = await generatePlanTasks(planId, {
       repository: getRepository(),
       aiConfig
     });
 
+    console.log("[tasks/generate] 成功，生成 tasks:", result.tasks.length, "warnings:", result.warnings.length);
     return NextResponse.json(result);
   } catch (error) {
+    console.error("[tasks/generate] 失败:", error instanceof Error ? error.message : error);
     return toErrorResponse(error);
   }
 }

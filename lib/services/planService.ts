@@ -257,20 +257,28 @@ export async function generatePlanTasks(
   dependencies: PlanServiceDependencies = {}
 ): Promise<GeneratePlanTasksResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
+  console.log("[planService.generatePlanTasks] 查询计划 planId:", planId);
   const plan = await requirePlan(planId, repository);
+  console.log("[planService.generatePlanTasks] 计划已找到 title:", plan.title, "totalMinutes:", plan.totalMinutes);
+
   const provider = dependencies.aiConfig
     ? createProviderFromConfig(dependencies.aiConfig)
     : undefined;
+  console.log("[planService.generatePlanTasks] Provider:", provider?.constructor.name ?? "default MockAiPlanningProvider");
+
   const generation = await generateLearningTasks({
     title: plan.title,
     goal: plan.goal,
     totalMinutes: plan.totalMinutes
   }, provider);
+  console.log("[planService.generatePlanTasks] AI 生成完成 tasks:", generation.tasks.length, "warnings:", generation.warnings.length);
+
   const tasks = await repository.savePlanTasks({
     planId,
     tasks: generation.tasks,
     warnings: generation.warnings
   });
+  console.log("[planService.generatePlanTasks] 保存完成 tasks:", tasks.length);
 
   return {
     planId,
@@ -832,10 +840,10 @@ export function createPrismaPlanRepository(): PlanRepository {
       };
     },
     async savePlanTasks(input) {
+      console.log("[PrismaRepo.savePlanTasks] 开始保存 planId:", input.planId, "tasks:", input.tasks.length);
       const result = await prisma.$transaction(async (tx) => {
-        await tx.learningTask.deleteMany({ where: { planId: input.planId } });
-        await tx.scheduledSession.deleteMany({ where: { planId: input.planId } });
-        await tx.busySlot.deleteMany({ where: { planId: input.planId } });
+        const deletedTasks = await tx.learningTask.deleteMany({ where: { planId: input.planId } });
+        console.log("[PrismaRepo.savePlanTasks] 已清理旧 tasks:", deletedTasks.count);
 
         const tasks = await Promise.all(
           input.tasks.map((task) =>
@@ -854,10 +862,12 @@ export function createPrismaPlanRepository(): PlanRepository {
             })
           )
         );
+        console.log("[PrismaRepo.savePlanTasks] 已写入新 tasks:", tasks.length);
 
         return { tasks };
       });
 
+      console.log("[PrismaRepo.savePlanTasks] 事务完成，返回 tasks:", result.tasks.length);
       return result.tasks.map(mapPrismaTask);
     },
     async savePlanSchedule(input) {
