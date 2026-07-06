@@ -11,6 +11,7 @@ import {
   Sparkles,
   Trash2
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
@@ -21,6 +22,7 @@ import type {
   GeneratePlanResponse,
   PlanCreationFormState
 } from "@/lib/client/planCreation";
+import { isApiConfigured } from "@/lib/client/aiConfig";
 
 const weekdays = [
   { value: 1, label: "Mon" },
@@ -72,6 +74,12 @@ export function PlanCreationFlow() {
   const validation = validatePlanCreationForm(form);
   const visibleBusySlots = useMemo(() => filterBusySlots(form), [form]);
 
+  // 分层引导 · 信息提示：检测是否配置了真实 API（mock 不算已配置）
+  const aiConfigWarning = useMemo(() => {
+    if (isApiConfigured()) return null;
+    return "尚未配置 AI 接口，当前将使用模拟数据生成计划。如需真正的 AI 智能排程，请先配置 OpenAI 兼容接口。";
+  }, []);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextValidation = validatePlanCreationForm(form);
@@ -118,6 +126,24 @@ export function PlanCreationFlow() {
               </div>
             </div>
           </header>
+
+          {aiConfigWarning ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">尚未配置 AI 接口</p>
+                  <p className="mt-1">{aiConfigWarning}</p>
+                  <Link
+                    className="mt-2 inline-block font-semibold underline hover:text-amber-900"
+                    href="/settings"
+                  >
+                    前往设置 →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
             <section className="grid gap-4 border-b border-border pb-5 sm:grid-cols-2">

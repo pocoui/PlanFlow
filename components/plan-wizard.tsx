@@ -12,10 +12,13 @@ import {
   Sparkles,
   X
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { validateWeeklyAvailability } from "@planflow/shared";
 import type { WeeklyAvailabilityRuleInput } from "@planflow/shared";
+
+import { isApiConfigured, validateCurrentAiConfig } from "@/lib/client/aiConfig";
 
 import {
   generatePlanTasks,
@@ -134,6 +137,12 @@ export function PlanWizard() {
           ? !!state.tasks && state.tasks.length > 0
           : true;
 
+  // 分层引导 · 信息提示：检测是否配置了真实 API（mock 不算已配置）
+  const aiConfigWarning = useMemo(() => {
+    if (isApiConfigured()) return null;
+    return "尚未配置 AI 接口，当前将使用模拟数据生成计划。如需真正的 AI 智能排程，请先配置 OpenAI 兼容接口。";
+  }, []);
+
   const setPlanInfo = useCallback((patch: Partial<PlanInfo>) => {
     setState((prev) => ({
       ...prev,
@@ -173,6 +182,13 @@ export function PlanWizard() {
       showError(
         Object.values(availabilityValidation.errors)[0] ?? "可用时间配置不正确"
       );
+      return;
+    }
+
+    // 分层引导 · 硬校验：openai_compatible 模式缺少凭证时阻止创建
+    const aiConfigCheck = validateCurrentAiConfig();
+    if (!aiConfigCheck.valid) {
+      showError(aiConfigCheck.reason ?? "AI 配置无效，请前往设置页面配置。");
       return;
     }
 
@@ -263,6 +279,24 @@ export function PlanWizard() {
               <AlertCircle className="mr-1 inline h-4 w-4" />
             ) : null}
             {message.text}
+          </div>
+        ) : null}
+
+        {aiConfigWarning ? (
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-semibold">尚未配置 AI 接口</p>
+                <p className="mt-1">{aiConfigWarning}</p>
+                <Link
+                  className="mt-2 inline-block font-semibold underline hover:text-amber-900"
+                  href="/settings"
+                >
+                  前往设置 →
+                </Link>
+              </div>
+            </div>
           </div>
         ) : null}
 

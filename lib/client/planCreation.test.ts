@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCreatePlanPayload,
+  checkAiConfigValid,
   createAndGeneratePlan,
   validatePlanCreationForm
 } from "./planCreation";
@@ -91,6 +92,83 @@ describe("planCreation", () => {
     await expect(createAndGeneratePlan(validForm(), fetcher)).rejects.toThrow(
       "availability is invalid."
     );
+  });
+});
+
+describe("checkAiConfigValid", () => {
+  it("returns null for mock provider (even with empty fields)", () => {
+    const result = checkAiConfigValid({
+      provider: "mock",
+      openai: { baseUrl: "", model: "", apiKey: "" }
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null for fully configured openai_compatible", () => {
+    const result = checkAiConfigValid({
+      provider: "openai_compatible",
+      openai: {
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4",
+        apiKey: "sk-test-key"
+      }
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("returns error when apiKey is empty", () => {
+    const result = checkAiConfigValid({
+      provider: "openai_compatible",
+      openai: {
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4",
+        apiKey: ""
+      }
+    });
+
+    expect(result).toContain("API Key");
+    expect(result).toContain("AI 配置不完整");
+  });
+
+  it("returns error when baseUrl is empty", () => {
+    const result = checkAiConfigValid({
+      provider: "openai_compatible",
+      openai: {
+        baseUrl: "",
+        model: "gpt-4",
+        apiKey: "sk-test"
+      }
+    });
+
+    expect(result).toContain("Base URL");
+    expect(result).toContain("AI 配置不完整");
+  });
+
+  it("returns error when model is empty", () => {
+    const result = checkAiConfigValid({
+      provider: "openai_compatible",
+      openai: {
+        baseUrl: "https://api.openai.com/v1",
+        model: "",
+        apiKey: "sk-test"
+      }
+    });
+
+    expect(result).toContain("Model");
+    expect(result).toContain("AI 配置不完整");
+  });
+
+  it("lists all missing fields when everything is empty", () => {
+    const result = checkAiConfigValid({
+      provider: "openai_compatible",
+      openai: { baseUrl: "", model: "", apiKey: "" }
+    });
+
+    expect(result).toContain("Base URL");
+    expect(result).toContain("Model");
+    expect(result).toContain("API Key");
   });
 });
 

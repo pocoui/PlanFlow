@@ -167,12 +167,19 @@ export async function createAndGeneratePlan(
   fetcher: PlanCreationFetcher = fetch
 ): Promise<PlanCreationResult> {
   const payload = buildCreatePlanPayload(form);
+
+  // 分层引导 · 硬校验：配置无效时在创建计划前就报错，避免浪费一次 API 调用
+  const aiConfig = getAiConfig();
+  const configError = checkAiConfigValid(aiConfig);
+  if (configError !== null) {
+    throw new Error(configError);
+  }
+
   const plan = await postJson<CreatedPlanResponse>(
     "/api/plans",
     payload,
     fetcher
   );
-  const aiConfig = getAiConfig();
   const generation = await postJson<GeneratePlanResponse>(
     `/api/plans/${plan.id}/generate`,
     { aiConfig },
@@ -187,6 +194,11 @@ export async function generatePlanTasks(
   fetcher: PlanCreationFetcher = fetch
 ): Promise<GenerateTasksResponse> {
   const aiConfig = getAiConfig();
+  const configError = checkAiConfigValid(aiConfig);
+  if (configError !== null) {
+    throw new Error(configError);
+  }
+
   return postJson<GenerateTasksResponse>(
     `/api/plans/${planId}/tasks/generate`,
     { aiConfig },
@@ -208,6 +220,26 @@ export async function schedulePlan(
 /** 从 localStorage 读取当前 AI 配置，供前端组件使用 */
 export function getCurrentAiConfig(): AiProviderConfig {
   return getAiConfig();
+}
+
+/**
+ * 检查 AI 配置是否可用于调用真实 API。
+ * 返回 `null` 表示通过；否则返回人类可读的错误原因。
+ * mock 模式始终通过；openai_compatible 需要 baseUrl / model / apiKey 三项均非空。
+ */
+export function checkAiConfigValid(config: AiProviderConfig): string | null {
+  if (config.provider === "mock") return null;
+
+  const missing: string[] = [];
+  if (!config.openai.baseUrl.trim()) missing.push("Base URL");
+  if (!config.openai.model.trim()) missing.push("Model");
+  if (!config.openai.apiKey.trim()) missing.push("API Key");
+
+  if (missing.length > 0) {
+    return `AI 配置不完整，缺少：${missing.join("、")}。请前往设置页面配置。`;
+  }
+
+  return null;
 }
 
 async function postJson<T>(
