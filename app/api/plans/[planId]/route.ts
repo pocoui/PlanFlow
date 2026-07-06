@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getPlan, PlanServiceError } from "@/lib/services/planService";
+import { deletePlan, getPlan, PlanServiceError } from "@/lib/services/planService";
 import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
@@ -15,6 +15,17 @@ export async function GET(_request: Request, context: RouteContext) {
     const plan = await getPlan(planId, { repository: getRepository() });
 
     return NextResponse.json(plan);
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const { planId } = await context.params;
+    await deletePlan(planId, { repository: getRepository() });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     return toErrorResponse(error);
   }

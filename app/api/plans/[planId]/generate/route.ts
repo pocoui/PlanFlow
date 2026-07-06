@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { generatePlan, PlanServiceError } from "@/lib/services/planService";
-import { getAiConfig } from "@/lib/server/aiConfig";
+import { getAiConfigFromEnv } from "@/lib/server/aiConfig";
 import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
@@ -10,12 +10,24 @@ interface RouteContext {
   }>;
 }
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
+
+    // 优先从请求体读取 AI 配置（前端 localStorage），否则用环境变量兜底
+    let aiConfig = getAiConfigFromEnv();
+    try {
+      const body = (await request.json()) as { aiConfig?: unknown };
+      if (body.aiConfig && typeof body.aiConfig === "object") {
+        aiConfig = body.aiConfig as typeof aiConfig;
+      }
+    } catch {
+      // 请求体为空或不合法，使用环境变量兜底
+    }
+
     const result = await generatePlan(planId, {
       repository: getRepository(),
-      aiConfig: getAiConfig()
+      aiConfig
     });
 
     return NextResponse.json(result);

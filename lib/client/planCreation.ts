@@ -1,5 +1,7 @@
 import { validateWeeklyAvailability } from "@planflow/shared";
 import type { WeeklyAvailabilityRuleInput } from "@planflow/shared";
+import { getAiConfig } from "./aiConfig";
+import type { AiProviderConfig } from "./aiConfig";
 
 export interface PlanCreationFormState {
   title: string;
@@ -170,9 +172,10 @@ export async function createAndGeneratePlan(
     payload,
     fetcher
   );
+  const aiConfig = getAiConfig();
   const generation = await postJson<GeneratePlanResponse>(
     `/api/plans/${plan.id}/generate`,
-    undefined,
+    { aiConfig },
     fetcher
   );
 
@@ -183,9 +186,10 @@ export async function generatePlanTasks(
   planId: string,
   fetcher: PlanCreationFetcher = fetch
 ): Promise<GenerateTasksResponse> {
+  const aiConfig = getAiConfig();
   return postJson<GenerateTasksResponse>(
     `/api/plans/${planId}/tasks/generate`,
-    undefined,
+    { aiConfig },
     fetcher
   );
 }
@@ -199,6 +203,11 @@ export async function schedulePlan(
     undefined,
     fetcher
   );
+}
+
+/** 从 localStorage 读取当前 AI 配置，供前端组件使用 */
+export function getCurrentAiConfig(): AiProviderConfig {
+  return getAiConfig();
 }
 
 async function postJson<T>(

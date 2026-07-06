@@ -3,19 +3,16 @@
 import { AlertCircle, CheckCircle2, Loader2, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-// 设置页面——配置 AI Agent API。
+import {
+  getAiConfig,
+  saveAiConfig,
+  getApiKeyPreview
+} from "@/lib/client/aiConfig";
+import type { AiProviderConfig } from "@/lib/client/aiConfig";
+
+// 设置页面——配置 AI Agent API，所有配置存储在 localStorage。
 // 与 Vue3 对比：useState 管理表单状态 ↔ ref/reactive，useEffect 加载初始数据 ↔ onMounted，
 // useCallback 稳定回调引用 ↔ methods。
-
-interface AiConfigDisplay {
-  provider: "mock" | "openai_compatible";
-  openai: {
-    baseUrl: string;
-    model: string;
-    apiKeyConfigured: boolean;
-    apiKeyPreview: string;
-  };
-}
 
 interface FormState {
   provider: "mock" | "openai_compatible";
@@ -46,7 +43,6 @@ export default function SettingsPage() {
     apiKey: ""
   });
   const [apiKeyPreview, setApiKeyPreview] = useState("");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -59,67 +55,42 @@ export default function SettingsPage() {
     latencyMs: null
   });
 
-  const loadConfig = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/settings/ai");
-      const data = (await response.json()) as AiConfigDisplay;
-
-      setForm({
-        provider: data.provider,
-        baseUrl: data.openai.baseUrl,
-        model: data.openai.model,
-        apiKey: ""
-      });
-      setApiKeyPreview(data.openai.apiKeyPreview);
-    } catch {
-      setMessage({ type: "error", text: "加载配置失败" });
-    } finally {
-      setLoading(false);
-    }
+  // 从 localStorage 加载配置
+  const loadConfig = useCallback(() => {
+    const config = getAiConfig();
+    setForm({
+      provider: config.provider,
+      baseUrl: config.openai.baseUrl,
+      model: config.openai.model,
+      apiKey: "" // 不回填 apiKey，只显示脱敏预览
+    });
+    setApiKeyPreview(config.openai.apiKey ? getApiKeyPreview(config.openai.apiKey) : "");
   }, []);
 
   useEffect(() => {
-    void loadConfig();
+    loadConfig();
   }, [loadConfig]);
 
-  async function handleSave() {
+  function handleSave() {
     setSaving(true);
     setMessage(null);
 
     try {
-      const payload: Record<string, unknown> = {
-        provider: form.provider
-      };
-
-      if (form.provider === "openai_compatible") {
-        payload.openai = {
+      const currentConfig = getAiConfig();
+      const config: AiProviderConfig = {
+        provider: form.provider,
+        openai: {
           baseUrl: form.baseUrl,
           model: form.model,
-          // 如果用户没有输入新的 apiKey，不覆盖已有配置
-          ...(form.apiKey ? { apiKey: form.apiKey } : {})
-        };
-      }
+          // 如果用户没有输入新的 apiKey，保留已有的
+          apiKey: form.apiKey || currentConfig.openai.apiKey
+        }
+      };
 
-      const response = await fetch("/api/settings/ai", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      saveAiConfig(config);
 
-      if (!response.ok) throw new Error("保存失败");
-
-      const data = (await response.json()) as AiConfigDisplay;
-
-      setForm((prev) => ({
-        ...prev,
-        provider: data.provider,
-        baseUrl: data.openai.baseUrl,
-        model: data.openai.model,
-        apiKey: ""
-      }));
-      setApiKeyPreview(data.openai.apiKeyPreview);
-
+      // 刷新表单状态
+      loadConfig();
       setMessage({ type: "success", text: "AI 配置已保存" });
     } catch (error) {
       setMessage({
@@ -135,34 +106,27 @@ export default function SettingsPage() {
     setTestResult({ testing: true, success: null, message: "", latencyMs: null });
 
     try {
-      // 先保存当前配置
-      const savePayload: Record<string, unknown> = {
-        provider: form.provider
-      };
-
-      if (form.provider === "openai_compatible") {
-        savePayload.openai = {
+      // 先保存当前配置到 localStorage
+      const currentConfig = getAiConfig();
+      const config: AiProviderConfig = {
+        provider: form.provider,
+        openai: {
           baseUrl: form.baseUrl,
           model: form.model,
-          ...(form.apiKey ? { apiKey: form.apiKey } : {})
-        };
-      }
+          apiKey: form.apiKey || currentConfig.openai.apiKey
+        }
+      };
+      saveAiConfig(config);
 
-      await fetch("/api/settings/ai", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(savePayload)
-      });
-
-      // 发起测试请求，apiKey 留空时用 useSavedKey 让后端取已保存的值
+      // 发送测试请求，直接将完整配置传给服务端
       const response = await fetch("/api/settings/ai/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          baseUrl: form.baseUrl,
-          model: form.model,
-          apiKey: form.apiKey || undefined,
-          useSavedKey: !form.apiKey
+          provider: config.provider,
+          baseUrl: config.openai.baseUrl,
+          model: config.openai.model,
+          apiKey: config.openai.apiKey
         })
       });
 
@@ -202,13 +166,8 @@ export default function SettingsPage() {
     setForm((prev) => ({ ...prev, baseUrl, model }));
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // 当前可用于测试的 apiKey（表单新输入 > 已保存的）
+  const effectiveApiKey = form.apiKey || getAiConfig().openai.apiKey;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-8">
@@ -347,7 +306,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-primary hover:text-primary disabled:opacity-60"
-                    disabled={testResult.testing || !form.baseUrl || !form.model || (!form.apiKey && !apiKeyPreview)}
+                    disabled={testResult.testing || !form.baseUrl || !form.model || !effectiveApiKey}
                     type="button"
                     onClick={() => handleTest()}
                   >

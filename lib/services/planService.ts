@@ -137,6 +137,7 @@ export interface PlanRepository {
   createPlan(input: CreatePlanRepositoryInput): Promise<PlanRecord>;
   getPlan(planId: string): Promise<PlanRecord | null>;
   listPlans(): Promise<PlanRecord[]>;
+  deletePlan(planId: string): Promise<void>;
   savePlanGeneration(input: SavePlanGenerationInput): Promise<GeneratePlanResult>;
   savePlanTasks(input: SavePlanTasksInput): Promise<LearningTaskRecord[]>;
   savePlanSchedule(input: SavePlanScheduleInput): Promise<GeneratePlanResult>;
@@ -343,6 +344,15 @@ export async function getPlan(
   };
 }
 
+export async function deletePlan(
+  planId: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<void> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  await requirePlan(planId, repository);
+  await repository.deletePlan(planId);
+}
+
 export async function updateTaskStatus(
   taskId: string,
   status: string,
@@ -499,6 +509,12 @@ export function createInMemoryPlanRepository(): PlanRepository {
     },
     async listPlans() {
       return Array.from(plans.values()).map(clonePlan);
+    },
+    async deletePlan(planId) {
+      if (!plans.has(planId)) {
+        throw new PlanServiceError("NOT_FOUND", "Plan not found.");
+      }
+      plans.delete(planId);
     },
     async savePlanGeneration(input) {
       const plan = plans.get(input.planId);
@@ -737,6 +753,14 @@ export function createPrismaPlanRepository(): PlanRepository {
       });
 
       return plans.map(mapPrismaPlan);
+    },
+    async deletePlan(planId) {
+      try {
+        await prisma.learningPlan.delete({ where: { id: planId } });
+      } catch (error) {
+        throwNotFoundForMissingRecord(error, "Plan not found.");
+        throw error;
+      }
     },
     async savePlanGeneration(input) {
       const result = await prisma.$transaction(async (tx) => {

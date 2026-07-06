@@ -1,31 +1,28 @@
 import { NextResponse } from "next/server";
 
-import { getAiConfig } from "@/lib/server/aiConfig";
-import { OpenAiCompatibleProvider } from "@/lib/services/aiPlanningService";
-
 // POST /api/settings/ai/test — 测试 AI API 连接是否成功
-// 发送一条简短消息，验证 API Key、Base URL、Model 是否有效。
+// 前端将完整配置（含 apiKey）从 localStorage 传过来，服务端只做验证请求。
 
 interface TestRequestBody {
+  provider?: string;
   baseUrl?: string;
   model?: string;
   apiKey?: string;
-  useSavedKey?: boolean;
 }
 
 export async function POST(request: Request) {
   const body = (await request.json()) as TestRequestBody;
 
-  // 如果前端传 useSavedKey，从服务端已保存配置中获取 apiKey
-  let baseUrl = body.baseUrl ?? "";
-  let model = body.model ?? "";
-  let apiKey = body.apiKey ?? "";
+  const baseUrl = body.baseUrl ?? "";
+  const model = body.model ?? "";
+  const apiKey = body.apiKey ?? "";
 
-  if (body.useSavedKey) {
-    const saved = getAiConfig();
-    baseUrl = baseUrl || saved.openai.baseUrl;
-    model = model || saved.openai.model;
-    apiKey = apiKey || saved.openai.apiKey;
+  if (body.provider === "mock") {
+    return NextResponse.json({
+      success: true,
+      message: "Mock 模式无需连接测试",
+      latencyMs: 0
+    });
   }
 
   if (!baseUrl || !model || !apiKey) {
@@ -36,7 +33,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 发送一个简短请求，验证连接和 Key 是否有效
     const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
     const startMs = Date.now();
 
