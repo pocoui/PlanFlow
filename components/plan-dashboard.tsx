@@ -79,10 +79,8 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
   }, [planId]);
 
   useEffect(() => {
-    if (viewState === "loading" && !plan) {
-      void loadPlan();
-    }
-  }, [viewState, plan, loadPlan]);
+    void loadPlan();
+  }, [loadPlan]);
 
   const sessions = useMemo(() => plan?.sessions ?? [], [plan]);
   const tasks = useMemo(() => plan?.tasks ?? [], [plan]);
