@@ -74,6 +74,87 @@ MVP 阶段保持状态管理简单：
 
 Route Handlers 保持轻薄，业务逻辑放在 service 中。第一版不额外引入 Express 或 NestJS，避免增加跨服务联调、CORS 和部署复杂度；后续业务复杂度上升时，可以把 `lib/services` 中的逻辑迁移到独立 Node/NestJS 服务。
 
+### Prisma Client 调用链路
+
+#### 初始化与配置
+
+Prisma Client 采用全局单例模式，防止 Next.js Hot Reload 时重复创建连接：
+
+```
+lib/db/prisma.ts
+    ↓
+globalThis.prisma 单例（开发环境持久化）
+    ↓
+PrismaClient({ log: ["query", "error", "warn"] })
+    ↓
+读取 .env 中的 DATABASE_URL
+```
+
+**文件：** `lib/db/prisma.ts`
+
+#### 调用层级
+
+```
+API Route (app/api/**/route.ts)
+    ↓
+getRepository() → 获取仓库实例
+    ↓
+PlanService 函数 (lib/services/planService.ts)
+    ↓
+createPrismaPlanRepository() → Prisma Client 操作
+    ↓
+PostgreSQL 数据库
+```
+
+#### Prisma 操作清单
+
+| 操作类型 | Prisma 调用 | 对应服务 |
+|---------|------------|---------|
+| 创建 | `prisma.user.upsert` | 用户管理 |
+| 创建 | `prisma.learningPlan.create` | 创建计划 |
+| 查询 | `prisma.learningPlan.findUnique` | 获取计划详情 |
+| 查询 | `prisma.learningPlan.findMany` | 列出计划 |
+| 删除 | `prisma.learningPlan.delete` | 删除计划 |
+| 事务 | `prisma.$transaction` | 生成计划、保存任务、保存排程、提交复盘 |
+| 更新 | `prisma.learningTask.update` | 更新任务状态 |
+| 更新 | `prisma.scheduledSession.update` | 更新会话状态 |
+| 查询 | `prisma.scheduledSession.findUnique` | 获取会话上下文 |
+
+#### 数据模型
+
+| 模型 | 用途 |
+|------|------|
+| `User` | 用户 |
+| `LearningPlan` | 学习计划（核心） |
+| `AvailabilityRule` | 可用时间规则 |
+| `LearningTask` | 学习任务 |
+| `ScheduledSession` | 排程会话 |
+| `BusySlot` | 忙碌时间段 |
+| `SessionReview` | 会话复盘 |
+
+#### 枚举类型
+
+| 枚举 | 值 |
+|------|----|
+| `PlanStatus` | `draft`, `generated`, `archived` |
+| `TaskStatus` | `not_started`, `in_progress`, `completed`, `delayed` |
+| `SessionStatus` | `scheduled`, `completed`, `missed`, `rescheduled`, `conflicted` |
+| `ReviewResult` | `completed`, `partial`, `not_completed`, `skipped` |
+
+#### Repository 工厂模式
+
+`lib/server/repository.ts` 根据环境变量决定使用哪种仓库：
+
+```typescript
+if (process.env.DATABASE_URL) {
+  return createPrismaPlanRepository();  // PostgreSQL
+} else {
+  return createInMemoryPlanRepository(); // 内存存储（开发/测试用）
+}
+```
+
+这样开发环境可以不配置数据库直接运行，测试时使用内存仓库避免数据库依赖。
+
 ## AI 设计
 
 AI 服务暴露接口：

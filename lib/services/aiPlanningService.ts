@@ -1,3 +1,15 @@
+const globalForAiTaskCounter = globalThis as unknown as {
+  __planflowAiTaskCounter?: number;
+};
+
+let aiTaskCounter = globalForAiTaskCounter.__planflowAiTaskCounter ?? 0;
+
+function nextAiTaskId(): string {
+  aiTaskCounter += 1;
+  globalForAiTaskCounter.__planflowAiTaskCounter = aiTaskCounter;
+  return `task_${aiTaskCounter}`;
+}
+
 export interface GenerateLearningTasksInput {
   title: string;
   goal: string;
@@ -219,7 +231,7 @@ function parseAiTasks(content: string): GeneratedLearningTask[] {
   }
 
   return parsed.map((item, index) => ({
-    id: `ai-task-${index + 1}`,
+    id: nextAiTaskId(),
     phase: item.phase ?? "其他",
     title: item.title ?? `任务 ${index + 1}`,
     description: item.description ?? "",
@@ -390,7 +402,7 @@ function buildMockTasks(input: GenerateLearningTasksInput): GeneratedLearningTas
   const minutes = splitMinutes(input.totalMinutes, taskDefinitions.length);
 
   return taskDefinitions.map((task, index) => ({
-    id: `mock-task-${index + 1}`,
+    id: nextAiTaskId(),
     phase: task.phase,
     title: task.title,
     description: task.description,
