@@ -12,7 +12,6 @@ import { useMemo } from "react";
 import type { DashboardGeneration } from "@/lib/client/planDashboard";
 import {
   buildCalendarExportUrl,
-  groupSessionsByDate,
   markSessionCompleted,
   summarizeGeneratedPlan
 } from "@/lib/client/planDashboard";

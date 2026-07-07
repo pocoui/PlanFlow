@@ -6,7 +6,8 @@ import {
   CheckCircle2,
   Clock,
   Download,
-  LayoutList,
+  LayoutGrid,
+  List,
   Loader2,
   RotateCcw,
   Sparkles,
@@ -61,13 +62,14 @@ export interface PlanDashboardProps {
 }
 
 type ViewState = "loading" | "ready" | "error";
+type WeekViewMode = "list" | "calendar";
 
 export function PlanDashboard({ planId }: PlanDashboardProps) {
   const [viewState, setViewState] = useState<ViewState>("loading");
   const [plan, setPlan] = useState<DashboardPlan | null>(null);
   const [message, setMessage] = useState("");
   const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
-  const [taskViewMode, setTaskViewMode] = useState<"list" | "calendar">("list");
+  const [weekViewMode, setWeekViewMode] = useState<WeekViewMode>("list");
 
   const loadPlan = useCallback(async () => {
     setViewState("loading");
@@ -323,113 +325,41 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CalendarClock className="h-5 w-5 text-primary" />
-          周视图
-        </h2>
-        {groupedSessions.map((group) => (
-          <div
-            className={`rounded-md border p-3 ${group.date === today ? "border-primary bg-primary/5" : "border-border bg-white"}`}
-            key={group.date}
-          >
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              {formatDate(group.date)}
-              {group.date === today ? (
-                <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
-                  今天
-                </span>
-              ) : null}
-            </div>
-            <div className="flex flex-col gap-2">
-              {group.sessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  taskTitle={taskTitleById.get(session.taskId) ?? "学习日程"}
-                  onComplete={() => completeSession(session.id)}
-                  onReview={() => setReviewSessionId(session.id)}
-                />
-              ))}
-              {groupedBusySlots
-                .filter((g) => g.date === group.date)
-                .flatMap((g) =>
-                  g.slots.map((slot) => (
-                    <BusySlotCard key={slot.id} slot={slot} />
-                  ))
-                )}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <CheckCircle2 className="h-5 w-5 text-primary" />
-            任务列表
+            <CalendarClock className="h-5 w-5 text-primary" />
+            周视图
           </h2>
-          {/* 视图切换 */}
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          <div className="inline-flex rounded-md border border-border bg-white p-0.5">
             <button
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                taskViewMode === "list"
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition ${
+                weekViewMode === "list"
                   ? "bg-primary text-primaryForeground shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100"
+                  : "text-slate-600 hover:text-primary"
               }`}
               type="button"
-              onClick={() => setTaskViewMode("list")}
+              onClick={() => setWeekViewMode("list")}
             >
-              <LayoutList className="h-3.5 w-3.5" />
+              <List className="h-3.5 w-3.5" />
               列表
             </button>
             <button
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                taskViewMode === "calendar"
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition ${
+                weekViewMode === "calendar"
                   ? "bg-primary text-primaryForeground shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100"
+                  : "text-slate-600 hover:text-primary"
               }`}
               type="button"
-              onClick={() => setTaskViewMode("calendar")}
+              onClick={() => setWeekViewMode("calendar")}
             >
-              <CalendarClock className="h-3.5 w-3.5" />
+              <LayoutGrid className="h-3.5 w-3.5" />
               日历
             </button>
           </div>
         </div>
 
-        {taskViewMode === "list" ? (
-          /* 列表视图：默认展示需要完成的任务 */
-          <div className="flex flex-col gap-2">
-            {tasks.map((task) => (
-              <div className="rounded-md border border-border bg-white p-3" key={task.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{task.title}</div>
-                    <div className="mt-1 text-sm text-slate-600">
-                      {task.estimatedMinutes} min
-                      {task.phase ? ` - ${task.phase}` : ""}
-                      {" - "}
-                      <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
-                        {taskStatusLabel(task.status ?? "not_started")}
-                      </span>
-                    </div>
-                  </div>
-                  {task.status !== "completed" ? (
-                    <button
-                      className="small-action"
-                      type="button"
-                      onClick={() => completeTask(task.id)}
-                    >
-                      完成
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* 日历视图：按日期展示所有任务及其排程 */
-          <div className="flex flex-col gap-2">
+        {weekViewMode === "list" ? (
+          <div className="flex flex-col gap-3">
             {groupedSessions.map((group) => (
               <div
                 className={`rounded-md border p-3 ${group.date === today ? "border-primary bg-primary/5" : "border-border bg-white"}`}
@@ -443,69 +373,70 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
                     </span>
                   ) : null}
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  {group.sessions.map((session) => {
-                    const task = tasks.find((t) => t.id === session.taskId);
-                    if (!task) return null;
-                    return (
-                      <div
-                        key={session.id}
-                        className={`flex items-center justify-between rounded-lg p-2.5 text-sm ${
-                          session.status === "completed"
-                            ? "bg-emerald-50 text-emerald-800"
-                            : session.status === "rescheduled"
-                              ? "bg-amber-50 text-amber-800"
-                              : "bg-primary/[0.04] text-slate-800"
-                        }`}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                                session.status === "completed"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : session.status === "rescheduled"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-primary/10 text-primary"
-                              }`}
-                            >
-                              <Clock className="h-3 w-3" />
-                              {formatTime(session.startAt)} - {formatTime(session.endAt)}
-                            </span>
-                            <span className="font-medium">{task.title}</span>
-                          </div>
-                          <div className="mt-0.5 text-xs text-slate-500">
-                            {task.estimatedMinutes} min
-                            {task.phase ? ` - ${task.phase}` : ""}
-                            {" - "}
-                            <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
-                              {taskStatusLabel(task.status ?? "not_started")}
-                            </span>
-                          </div>
-                        </div>
-                        {task.status !== "completed" && session.status === "scheduled" ? (
-                          <button
-                            className="ml-2 inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primaryForeground transition hover:bg-teal-800"
-                            type="button"
-                            onClick={() => completeTask(task.id)}
-                          >
-                            <CheckCircle2 className="h-3 w-3" />
-                            完成
-                          </button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                <div className="flex flex-col gap-2">
+                  {group.sessions.map((session) => (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      taskTitle={taskTitleById.get(session.taskId) ?? "学习日程"}
+                      onComplete={() => completeSession(session.id)}
+                      onReview={() => setReviewSessionId(session.id)}
+                    />
+                  ))}
+                  {groupedBusySlots
+                    .filter((g) => g.date === group.date)
+                    .flatMap((g) =>
+                      g.slots.map((slot) => (
+                        <BusySlotCard key={slot.id} slot={slot} />
+                      ))
+                    )}
                 </div>
               </div>
             ))}
-            {groupedSessions.length === 0 ? (
-              <div className="rounded-md border border-border bg-white p-6 text-center text-sm text-slate-500">
-                暂无排程任务，请先创建计划并生成排程。
-              </div>
-            ) : null}
           </div>
+        ) : (
+          <WeekCalendarView
+            groupedSessions={groupedSessions}
+            groupedBusySlots={groupedBusySlots}
+            today={today}
+            taskTitleById={taskTitleById}
+            onCompleteSession={completeSession}
+            onReviewSession={(id) => setReviewSessionId(id)}
+          />
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          任务列表
+        </h2>
+        {tasks.map((task) => (
+          <div className="rounded-md border border-border bg-white p-3" key={task.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-medium">{task.title}</div>
+                <div className="mt-1 text-sm text-slate-600">
+                  {task.estimatedMinutes} min
+                  {task.phase ? ` - ${task.phase}` : ""}
+                  {" - "}
+                  <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
+                    {taskStatusLabel(task.status ?? "not_started")}
+                  </span>
+                </div>
+              </div>
+              {task.status !== "completed" ? (
+                <button
+                  className="small-action"
+                  type="button"
+                  onClick={() => completeTask(task.id)}
+                >
+                  完成
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ))}
       </section>
 
       {generation.warnings.length > 0 ? (
@@ -532,6 +463,221 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
           onSubmit={handleReviewSubmit}
         />
       ) : null}
+    </div>
+  );
+}
+
+// 将 ISO 时间字符串转为本地整点标签
+function toLocalHourLabel(isoString: string): string {
+  const d = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:00`;
+}
+
+// 计算 session 跨越的小时数
+function getSessionHourSpan(startAt: string, endAt: string): number {
+  const diffMs = new Date(endAt).getTime() - new Date(startAt).getTime();
+  return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
+}
+
+// 获取某日期所在周的周一
+function getMonday(dateStr: string): Date {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+// 生成从周一开始的 7 天日期
+function generateWeekDates(monday: Date): string[] {
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    dates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  }
+  return dates;
+}
+
+// 生成连续小时时间槽
+function generateHourSlots(startHour: number, endHour: number): string[] {
+  const slots: string[] = [];
+  for (let h = startHour; h <= endHour; h++) {
+    slots.push(`${String(h).padStart(2, "0")}:00`);
+  }
+  return slots;
+}
+
+const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+function WeekCalendarView({
+  groupedSessions,
+  groupedBusySlots,
+  today,
+  taskTitleById,
+  onReviewSession
+}: {
+  groupedSessions: { date: string; sessions: DashboardSession[] }[];
+  groupedBusySlots: { date: string; slots: DashboardBusySlot[] }[];
+  today: string;
+  taskTitleById: Map<string, string>;
+  onReviewSession: (id: string) => void;
+}) {
+  // 收集所有日期，生成完整的周视图
+  const weekDates = useMemo(() => {
+    if (groupedSessions.length === 0) return [];
+    const firstDate = groupedSessions[0].date;
+    const monday = getMonday(firstDate);
+    return generateWeekDates(monday);
+  }, [groupedSessions]);
+
+  // 固定 08:00 - 22:00
+  const timeSlots = useMemo(() => generateHourSlots(8, 22), []);
+
+  // 按日期+小时分组 sessions
+  const sessionsByDateAndHour = useMemo(() => {
+    const map = new Map<string, Map<string, DashboardSession[]>>();
+    for (const group of groupedSessions) {
+      for (const session of group.sessions) {
+        const hour = toLocalHourLabel(session.startAt);
+        if (!map.has(group.date)) map.set(group.date, new Map());
+        const dateMap = map.get(group.date)!;
+        if (!dateMap.has(hour)) dateMap.set(hour, []);
+        dateMap.get(hour)!.push(session);
+      }
+    }
+    return map;
+  }, [groupedSessions]);
+
+  // 按日期+小时分组 busySlots
+  const busySlotsByDateAndHour = useMemo(() => {
+    const map = new Map<string, Map<string, DashboardBusySlot[]>>();
+    for (const group of groupedBusySlots) {
+      for (const slot of group.slots) {
+        const hour = toLocalHourLabel(slot.startAt);
+        if (!map.has(group.date)) map.set(group.date, new Map());
+        const dateMap = map.get(group.date)!;
+        if (!dateMap.has(hour)) dateMap.set(hour, []);
+        dateMap.get(hour)!.push(slot);
+      }
+    }
+    return map;
+  }, [groupedBusySlots]);
+
+  if (weekDates.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-white p-8 text-center text-sm text-slate-500">
+        暂无日程数据
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border bg-white">
+      <div className="min-w-[700px]">
+        {/* 表头 */}
+        <div className="grid grid-cols-8 border-b border-border bg-slate-50 text-xs font-semibold text-slate-600">
+          <div className="border-r border-border p-2 text-center">时间</div>
+          {weekDates.map((date) => {
+            const d = new Date(date);
+            const dayName = WEEKDAY_NAMES[d.getDay()];
+            const month = d.getMonth() + 1;
+            const day = d.getDate();
+            const isToday = date === today;
+            return (
+              <div
+                key={date}
+                className={`border-r border-border p-2 text-center last:border-r-0 ${
+                  isToday ? "bg-primary/5 text-primary" : ""
+                }`}
+              >
+                <div>{dayName}</div>
+                <div className="text-[10px] text-slate-500">{month}/{day}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 时间行 */}
+        {timeSlots.map((time) => (
+          <div
+            key={time}
+            className="grid grid-cols-8 border-b border-slate-100 last:border-b-0"
+            style={{ minHeight: "60px" }}
+          >
+            <div className="border-r border-border bg-slate-50/50 p-2 text-center text-xs text-slate-500">
+              {time}
+            </div>
+            {weekDates.map((date) => {
+              const hourSessions = sessionsByDateAndHour.get(date)?.get(time) ?? [];
+              const hourBusySlots = busySlotsByDateAndHour.get(date)?.get(time) ?? [];
+              return (
+                <div
+                  key={`${date}-${time}`}
+                  className="relative border-r border-slate-100 last:border-r-0"
+                >
+                  {/* 学习日程 */}
+                  {hourSessions.map((session) => {
+                    const hourSpan = getSessionHourSpan(session.startAt, session.endAt);
+                    const taskTitle = taskTitleById.get(session.taskId) ?? "学习日程";
+                    const isCompleted = session.status === "completed";
+                    const isRescheduled = session.status === "rescheduled";
+                    return (
+                      <div
+                        key={session.id}
+                        className={`absolute inset-x-1 cursor-pointer rounded px-2 py-1 text-xs ${
+                          isCompleted
+                            ? "bg-emerald-100 text-emerald-700"
+                            : isRescheduled
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-primary/10 text-primary"
+                        }`}
+                        style={{
+                          top: "2px",
+                          height: `calc(${hourSpan} * 60px - 4px)`,
+                          zIndex: 10
+                        }}
+                        onClick={() => {
+                          if (session.status === "scheduled") {
+                            onReviewSession(session.id);
+                          }
+                        }}
+                        title={`${taskTitle} (${hourSpan}小时)`}
+                      >
+                        <div className="font-medium truncate">{taskTitle}</div>
+                        {hourSpan > 1 && (
+                          <div className="text-[10px] opacity-75">
+                            {formatTime(session.startAt)} - {formatTime(session.endAt)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {/* 忙闲时段 */}
+                  {hourBusySlots.map((slot) => {
+                    const hourSpan = getSessionHourSpan(slot.startAt, slot.endAt);
+                    return (
+                      <div
+                        key={slot.id}
+                        className="absolute inset-x-1 rounded bg-red-100/80 px-2 py-1 text-xs text-red-700"
+                        style={{
+                          top: "2px",
+                          height: `calc(${hourSpan} * 60px - 4px)`,
+                          zIndex: 5
+                        }}
+                        title={`${slot.title}`}
+                      >
+                        <div className="font-medium truncate">{slot.title}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
