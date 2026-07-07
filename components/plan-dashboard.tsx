@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  LayoutList,
   Loader2,
   RotateCcw,
   Sparkles,
@@ -66,6 +67,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
   const [plan, setPlan] = useState<DashboardPlan | null>(null);
   const [message, setMessage] = useState("");
   const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
+  const [taskViewMode, setTaskViewMode] = useState<"list" | "calendar">("list");
 
   const loadPlan = useCallback(async () => {
     setViewState("loading");
@@ -361,36 +363,149 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CheckCircle2 className="h-5 w-5 text-primary" />
-          任务列表
-        </h2>
-        {tasks.map((task) => (
-          <div className="rounded-md border border-border bg-white p-3" key={task.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{task.title}</div>
-                <div className="mt-1 text-sm text-slate-600">
-                  {task.estimatedMinutes} min
-                  {task.phase ? ` - ${task.phase}` : ""}
-                  {" - "}
-                  <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
-                    {taskStatusLabel(task.status ?? "not_started")}
-                  </span>
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+            任务列表
+          </h2>
+          {/* 视图切换 */}
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+            <button
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                taskViewMode === "list"
+                  ? "bg-primary text-primaryForeground shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+              type="button"
+              onClick={() => setTaskViewMode("list")}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              列表
+            </button>
+            <button
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                taskViewMode === "calendar"
+                  ? "bg-primary text-primaryForeground shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+              type="button"
+              onClick={() => setTaskViewMode("calendar")}
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              日历
+            </button>
+          </div>
+        </div>
+
+        {taskViewMode === "list" ? (
+          /* 列表视图：默认展示需要完成的任务 */
+          <div className="flex flex-col gap-2">
+            {tasks.map((task) => (
+              <div className="rounded-md border border-border bg-white p-3" key={task.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{task.title}</div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      {task.estimatedMinutes} min
+                      {task.phase ? ` - ${task.phase}` : ""}
+                      {" - "}
+                      <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
+                        {taskStatusLabel(task.status ?? "not_started")}
+                      </span>
+                    </div>
+                  </div>
+                  {task.status !== "completed" ? (
+                    <button
+                      className="small-action"
+                      type="button"
+                      onClick={() => completeTask(task.id)}
+                    >
+                      完成
+                    </button>
+                  ) : null}
                 </div>
               </div>
-              {task.status !== "completed" ? (
-                <button
-                  className="small-action"
-                  type="button"
-                  onClick={() => completeTask(task.id)}
-                >
-                  完成
-                </button>
-              ) : null}
-            </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          /* 日历视图：按日期展示所有任务及其排程 */
+          <div className="flex flex-col gap-2">
+            {groupedSessions.map((group) => (
+              <div
+                className={`rounded-md border p-3 ${group.date === today ? "border-primary bg-primary/5" : "border-border bg-white"}`}
+                key={group.date}
+              >
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  {formatDate(group.date)}
+                  {group.date === today ? (
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
+                      今天
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {group.sessions.map((session) => {
+                    const task = tasks.find((t) => t.id === session.taskId);
+                    if (!task) return null;
+                    return (
+                      <div
+                        key={session.id}
+                        className={`flex items-center justify-between rounded-lg p-2.5 text-sm ${
+                          session.status === "completed"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : session.status === "rescheduled"
+                              ? "bg-amber-50 text-amber-800"
+                              : "bg-primary/[0.04] text-slate-800"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                session.status === "completed"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : session.status === "rescheduled"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              <Clock className="h-3 w-3" />
+                              {formatTime(session.startAt)} - {formatTime(session.endAt)}
+                            </span>
+                            <span className="font-medium">{task.title}</span>
+                          </div>
+                          <div className="mt-0.5 text-xs text-slate-500">
+                            {task.estimatedMinutes} min
+                            {task.phase ? ` - ${task.phase}` : ""}
+                            {" - "}
+                            <span className={task.status === "completed" ? "text-emerald-700" : "text-slate-500"}>
+                              {taskStatusLabel(task.status ?? "not_started")}
+                            </span>
+                          </div>
+                        </div>
+                        {task.status !== "completed" && session.status === "scheduled" ? (
+                          <button
+                            className="ml-2 inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primaryForeground transition hover:bg-teal-800"
+                            type="button"
+                            onClick={() => completeTask(task.id)}
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            完成
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {groupedSessions.length === 0 ? (
+              <div className="rounded-md border border-border bg-white p-6 text-center text-sm text-slate-500">
+                暂无排程任务，请先创建计划并生成排程。
+              </div>
+            ) : null}
+          </div>
+        )}
       </section>
 
       {generation.warnings.length > 0 ? (
