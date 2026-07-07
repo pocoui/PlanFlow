@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  BarChart3,
   CalendarDays,
   Home,
-  Layers,
   Settings,
   Sparkles
 } from "lucide-react";
@@ -14,12 +12,11 @@ import { usePathname } from "next/navigation";
 // 左侧导航栏，与原型图保持一致。
 // MVP 阶段「计划」「日历」为主流程，其余入口为占位或后续实现。
 
+// TODO: "任务""数据" tab 暂不实现，后续开发
 const navItems = [
   { label: "首页", href: "/", icon: Home },
   { label: "计划", href: "/plans/new", icon: Sparkles },
-  { label: "日历", href: "/dashboard", icon: CalendarDays },
-  { label: "任务", href: "#", icon: Layers },
-  { label: "数据", href: "#", icon: BarChart3 },
+  { label: "任务", href: "/dashboard", icon: CalendarDays },
   { label: "设置", href: "/settings", icon: Settings }
 ];
 
