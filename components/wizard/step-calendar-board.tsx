@@ -39,6 +39,42 @@ function toLocalHourLabel(isoString: string): string {
   return `${pad(d.getHours())}:00`;
 }
 
+// 获取某日期所在周的周一（周一为每周第一天）
+function getMonday(dateStr: string): Date {
+  const d = new Date(dateStr);
+  const day = d.getDay(); // 0=周日, 1=周一, ..., 6=周六
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 调整到周一
+  return new Date(d.setDate(diff));
+}
+
+// 生成从周一开始的 7 天日期
+function generateWeekDates(monday: Date): string[] {
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push(toLocalDateStr(d.toISOString()));
+  }
+  return dates;
+}
+
+// 生成小时时间槽（从 startHour 到 endHour）
+function generateHourSlots(startHour: number, endHour: number): string[] {
+  const slots: string[] = [];
+  for (let h = startHour; h <= endHour; h++) {
+    slots.push(`${String(h).padStart(2, "0")}:00`);
+  }
+  return slots;
+}
+
+// 计算 session 跨越的小时数
+function getSessionHourSpan(startAt: string, endAt: string): number {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const diffMs = end.getTime() - start.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60));
+}
+
 export function StepCalendarBoard({
   generation,
   totalHours,
@@ -52,19 +88,6 @@ export function StepCalendarBoard({
     () => summarizeGeneratedPlan(generation),
     [generation]
   );
-  // 按本地日期分组 sessions
-  const groupedByLocalDate = useMemo(() => {
-    const map = new Map<string, typeof generation.sessions>();
-    for (const session of generation.sessions) {
-      const date = toLocalDateStr(session.startAt);
-      const list = map.get(date) ?? [];
-      list.push(session);
-      map.set(date, list);
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, sessions]) => ({ date, sessions }));
-  }, [generation.sessions]);
 
   const today = toLocalDateStr(new Date().toISOString());
   const taskTitleById = useMemo(
@@ -72,23 +95,37 @@ export function StepCalendarBoard({
     [generation.tasks]
   );
 
+  // 生成完整的周视图日期（周一到周日）
   const weekDates = useMemo(() => {
-    if (groupedByLocalDate.length === 0) return [];
-    return groupedByLocalDate.map((g) => g.date).slice(0, 7);
-  }, [groupedByLocalDate]);
+    if (generation.sessions.length === 0) return [];
+    // 取第一个 session 的日期所在周的周一
+    const firstSessionDate = toLocalDateStr(generation.sessions[0].startAt);
+    const monday = getMonday(firstSessionDate);
+    return generateWeekDates(monday);
+  }, [generation.sessions]);
 
-  // 从 sessions 的本地时间自动提取出现的整点
+  // 生成连续的小时时间槽（08:00 到 22:00）
   const timeSlots = useMemo(() => {
-    const hours = new Set<string>();
-    hours.add("全天");
+    return generateHourSlots(8, 22);
+  }, []);
+
+  // 按日期和小时分组 sessions
+  const sessionsByDateAndHour = useMemo(() => {
+    const map = new Map<string, Map<string, typeof generation.sessions>>();
     for (const session of generation.sessions) {
-      hours.add(toLocalHourLabel(session.startAt));
+      const date = toLocalDateStr(session.startAt);
+      const hour = toLocalHourLabel(session.startAt);
+      
+      if (!map.has(date)) {
+        map.set(date, new Map());
+      }
+      const dateMap = map.get(date)!;
+      if (!dateMap.has(hour)) {
+        dateMap.set(hour, []);
+      }
+      dateMap.get(hour)!.push(session);
     }
-    // 确保常见时间段都有
-    for (const h of [8, 9, 10, 12, 14, 16, 18, 20, 22]) {
-      hours.add(`${String(h).padStart(2, "0")}:00`);
-    }
-    return Array.from(hours).sort();
+    return map;
   }, [generation.sessions]);
 
   return (
@@ -128,8 +165,9 @@ export function StepCalendarBoard({
         {/* 周日历网格 */}
         <div className="overflow-x-auto rounded-lg border border-slate-200">
           <div className="min-w-[800px]">
+            {/* 表头：时间 + 7天 */}
             <div className="grid grid-cols-8 border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-              <div className="border-r border-slate-200 p-2">时间</div>
+              <div className="border-r border-slate-200 p-2 text-center">时间</div>
               {weekDates.map((date) => (
                 <div
                   key={date}
@@ -138,51 +176,67 @@ export function StepCalendarBoard({
                   }`}
                 >
                   <div>{formatWeekday(date)}</div>
-                  <div className="text-[10px]">{formatDateShort(date)}</div>
+                  <div className="text-[10px] text-slate-500">{formatDateShort(date)}</div>
                 </div>
               ))}
             </div>
 
-            {timeSlots.map((time) => (
-              <div
-                key={time}
-                className="grid grid-cols-8 border-b border-slate-100 last:border-b-0"
-              >
-                <div className="border-r border-slate-200 p-2 text-xs text-slate-500">
-                  {time}
+            {/* 时间行 */}
+            <div className="relative">
+              {timeSlots.map((time) => (
+                <div
+                  key={time}
+                  className="grid grid-cols-8 border-b border-slate-100 last:border-b-0"
+                  style={{ minHeight: "60px" }}
+                >
+                  {/* 时间标签 */}
+                  <div className="border-r border-slate-200 bg-slate-50/50 p-2 text-center text-xs text-slate-500">
+                    {time}
+                  </div>
+                  {/* 7天列 */}
+                  {weekDates.map((date) => {
+                    const hourSessions = sessionsByDateAndHour.get(date)?.get(time) ?? [];
+                    return (
+                      <div
+                        key={`${date}-${time}`}
+                        className="relative border-r border-slate-100 last:border-r-0"
+                      >
+                        {hourSessions.map((session) => {
+                          const hourSpan = getSessionHourSpan(session.startAt, session.endAt);
+                          const taskTitle = taskTitleById.get(session.taskId) ?? "学习";
+                          return (
+                            <div
+                              key={session.id}
+                              className={`absolute inset-x-1 cursor-pointer rounded px-2 py-1 text-xs ${
+                                session.status === "completed"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : session.status === "rescheduled"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-primary/10 text-primary"
+                              }`}
+                              style={{
+                                top: "2px",
+                                height: `calc(${hourSpan} * 60px - 4px)`,
+                                zIndex: 10
+                              }}
+                              onClick={() => onReview(session.id)}
+                              title={`${taskTitle} (${hourSpan}小时)`}
+                            >
+                              <div className="font-medium truncate">{taskTitle}</div>
+                              {hourSpan > 1 && (
+                                <div className="text-[10px] opacity-75">
+                                  {formatTime(session.startAt)} - {formatTime(session.endAt)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
-                {weekDates.map((date) => {
-                  const cellSessions = generation.sessions.filter((s) => {
-                    const localDate = toLocalDateStr(s.startAt);
-                    const localHour = toLocalHourLabel(s.startAt);
-                    return localDate === date && localHour === time;
-                  });
-
-                  return (
-                    <div
-                      key={`${date}-${time}`}
-                      className="min-h-[60px] border-r border-slate-100 p-1 last:border-r-0"
-                    >
-                      {cellSessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className={`mb-1 cursor-pointer rounded px-2 py-1 text-[10px] ${
-                            session.status === "completed"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : session.status === "rescheduled"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-primary/10 text-primary"
-                          }`}
-                          onClick={() => onReview(session.id)}
-                        >
-                          {taskTitleById.get(session.taskId) ?? "学习"}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
