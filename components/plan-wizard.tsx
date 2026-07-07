@@ -93,11 +93,29 @@ const stepLabels: Record<WizardStep, string> = {
 
 const DEFAULT_BUFFER_MINUTES = 15;
 
+// 使用 toISOString 确保 SSR/客户端产出相同的 UTC 日期，避免水合不一致导致 input 清空
+function utcToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function utcDaysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function localDateStr(daysOffset = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const initialPlanInfo: PlanInfo = {
   goal: "",
   totalHours: "60",
-  startDate: "",
-  deadline: ""
+  startDate: utcToday(),
+  deadline: utcDaysFromNow(7)
 };
 
 const initialAvailability: DailyAvailability[] = [
@@ -141,6 +159,18 @@ export function PlanWizard() {
   const aiConfigWarning = useMemo(() => {
     if (isApiConfigured()) return null;
     return "尚未配置 AI 接口，当前将使用模拟数据生成计划。如需真正的 AI 智能排程，请先配置 OpenAI 兼容接口。";
+  }, []);
+
+  // 水合后将 UTC 日期修正为客户端本地日期
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      planInfo: {
+        ...prev.planInfo,
+        startDate: localDateStr(),
+        deadline: localDateStr(7)
+      }
+    }));
   }, []);
 
   const setPlanInfo = useCallback((patch: Partial<PlanInfo>) => {
@@ -564,6 +594,7 @@ function StepPlanInfo({
             className="input"
             type="date"
             value={planInfo.startDate}
+            suppressHydrationWarning
             onChange={(e) => onChange({ startDate: e.target.value })}
           />
         </Field>
@@ -573,6 +604,7 @@ function StepPlanInfo({
             className="input"
             type="date"
             value={planInfo.deadline}
+            suppressHydrationWarning
             onChange={(e) => onChange({ deadline: e.target.value })}
           />
         </Field>
