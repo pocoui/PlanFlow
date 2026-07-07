@@ -98,7 +98,10 @@ export function groupSessionsByDate(sessions: DashboardSession[]) {
         new Date(first.startAt).getTime() - new Date(second.startAt).getTime()
     )
     .forEach((session) => {
-      const date = session.startAt.slice(0, 10);
+      // 使用本地日期分组，避免时区偏差（UTC 20:00 = 北京次日 04:00）
+      const d = new Date(session.startAt);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       const dateSessions = grouped.get(date) ?? [];
       dateSessions.push(session);
       grouped.set(date, dateSessions);

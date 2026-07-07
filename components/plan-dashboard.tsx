@@ -40,7 +40,10 @@ function groupBusySlotsByDate(slots: DashboardBusySlot[]) {
         new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
     )
     .forEach((slot) => {
-      const date = slot.startAt.slice(0, 10);
+      // 使用本地日期而非 UTC 日期，避免时区偏差
+      const d = new Date(slot.startAt);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       const dateSlots = grouped.get(date) ?? [];
       dateSlots.push(slot);
       grouped.set(date, dateSlots);
@@ -108,13 +111,21 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
     () => new Map(tasks.map((task) => [task.id, task.title])),
     [tasks]
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const todayD = new Date();
+  const todayPad = (n: number) => String(n).padStart(2, "0");
+  const today = `${todayD.getFullYear()}-${todayPad(todayD.getMonth() + 1)}-${todayPad(todayD.getDate())}`;
 
   const todaySessions = sessions.filter(
-    (s) => s.startAt.slice(0, 10) === today
+    (s) => {
+      const d = new Date(s.startAt);
+      return `${d.getFullYear()}-${todayPad(d.getMonth() + 1)}-${todayPad(d.getDate())}` === today;
+    }
   );
   const todayBusySlots = busySlots.filter(
-    (b) => b.startAt.slice(0, 10) === today
+    (b) => {
+      const d = new Date(b.startAt);
+      return `${d.getFullYear()}-${todayPad(d.getMonth() + 1)}-${todayPad(d.getDate())}` === today;
+    }
   );
 
   async function completeTask(taskId: string) {

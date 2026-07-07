@@ -776,11 +776,11 @@ export function createPrismaPlanRepository(): PlanRepository {
         await tx.scheduledSession.deleteMany({ where: { planId: input.planId } });
         await tx.busySlot.deleteMany({ where: { planId: input.planId } });
 
+        // 不指定 id，让 Prisma 用 @default(cuid()) 自动生成，避免与已有记录冲突
         const tasks = await Promise.all(
           input.tasks.map((task) =>
             tx.learningTask.create({
               data: {
-                id: task.id,
                 planId: input.planId,
                 phase: task.phase,
                 title: task.title,
@@ -793,12 +793,19 @@ export function createPrismaPlanRepository(): PlanRepository {
             })
           )
         );
+
+        // 建立 AI 生成 ID → Prisma cuid 的映射，用于关联 sessions
+        const taskIdMapping = new Map<string, string>();
+        input.tasks.forEach((inputTask, index) => {
+          taskIdMapping.set(inputTask.id, tasks[index].id);
+        });
+
         const sessions = await Promise.all(
           input.sessions.map((session) =>
             tx.scheduledSession.create({
               data: {
                 planId: input.planId,
-                taskId: session.taskId,
+                taskId: taskIdMapping.get(session.taskId) ?? session.taskId,
                 startAt: session.startAt,
                 endAt: session.endAt,
                 durationMinutes: session.durationMinutes,
@@ -807,11 +814,11 @@ export function createPrismaPlanRepository(): PlanRepository {
             })
           )
         );
+        // 不指定 id，让 Prisma 用 @default(cuid()) 自动生成
         const busySlots = await Promise.all(
           input.busySlots.map((slot) =>
             tx.busySlot.create({
               data: {
-                id: slot.id,
                 planId: input.planId,
                 source: slot.source,
                 externalEventId: slot.externalEventId,
@@ -845,11 +852,11 @@ export function createPrismaPlanRepository(): PlanRepository {
         const deletedTasks = await tx.learningTask.deleteMany({ where: { planId: input.planId } });
         console.log("[PrismaRepo.savePlanTasks] 已清理旧 tasks:", deletedTasks.count);
 
+        // 不指定 id，让 Prisma 用 @default(cuid()) 自动生成，避免与已有记录冲突
         const tasks = await Promise.all(
           input.tasks.map((task) =>
             tx.learningTask.create({
               data: {
-                id: task.id,
                 planId: input.planId,
                 phase: task.phase,
                 title: task.title,
@@ -884,6 +891,7 @@ export function createPrismaPlanRepository(): PlanRepository {
         await tx.scheduledSession.deleteMany({ where: { planId: input.planId } });
         await tx.busySlot.deleteMany({ where: { planId: input.planId } });
 
+        // 不指定 id，让 Prisma 用 @default(cuid()) 自动生成
         const sessions = await Promise.all(
           input.sessions.map((session) =>
             tx.scheduledSession.create({
@@ -902,7 +910,6 @@ export function createPrismaPlanRepository(): PlanRepository {
           input.busySlots.map((slot) =>
             tx.busySlot.create({
               data: {
-                id: slot.id,
                 planId: input.planId,
                 source: slot.source,
                 externalEventId: slot.externalEventId,

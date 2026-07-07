@@ -25,6 +25,20 @@ import {
   formatWeekday
 } from "./wizard-utils";
 
+// 将 ISO 时间字符串转为本地日期字符串（如 "2026-07-08"）
+function toLocalDateStr(isoString: string): string {
+  const d = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// 将 ISO 时间字符串转为本地整点时间标签（如 "09:00"）
+function toLocalHourLabel(isoString: string): string {
+  const d = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:00`;
+}
+
 export function StepCalendarBoard({
   generation,
   totalHours,
@@ -38,33 +52,44 @@ export function StepCalendarBoard({
     () => summarizeGeneratedPlan(generation),
     [generation]
   );
-  const grouped = useMemo(
-    () => groupSessionsByDate(generation.sessions),
-    [generation.sessions]
-  );
-  const today = new Date().toISOString().slice(0, 10);
+  // 按本地日期分组 sessions
+  const groupedByLocalDate = useMemo(() => {
+    const map = new Map<string, typeof generation.sessions>();
+    for (const session of generation.sessions) {
+      const date = toLocalDateStr(session.startAt);
+      const list = map.get(date) ?? [];
+      list.push(session);
+      map.set(date, list);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, sessions]) => ({ date, sessions }));
+  }, [generation.sessions]);
+
+  const today = toLocalDateStr(new Date().toISOString());
   const taskTitleById = useMemo(
     () => new Map(generation.tasks.map((t) => [t.id, t.title])),
     [generation.tasks]
   );
 
   const weekDates = useMemo(() => {
-    if (grouped.length === 0) return [];
-    return grouped.map((g) => g.date).slice(0, 7);
-  }, [grouped]);
+    if (groupedByLocalDate.length === 0) return [];
+    return groupedByLocalDate.map((g) => g.date).slice(0, 7);
+  }, [groupedByLocalDate]);
 
-  const timeSlots = [
-    "全天",
-    "08:00",
-    "09:00",
-    "10:00",
-    "12:00",
-    "14:00",
-    "16:00",
-    "18:00",
-    "20:00",
-    "22:00"
-  ];
+  // 从 sessions 的本地时间自动提取出现的整点
+  const timeSlots = useMemo(() => {
+    const hours = new Set<string>();
+    hours.add("全天");
+    for (const session of generation.sessions) {
+      hours.add(toLocalHourLabel(session.startAt));
+    }
+    // 确保常见时间段都有
+    for (const h of [8, 9, 10, 12, 14, 16, 18, 20, 22]) {
+      hours.add(`${String(h).padStart(2, "0")}:00`);
+    }
+    return Array.from(hours).sort();
+  }, [generation.sessions]);
 
   return (
     <section className="flex flex-col gap-5 lg:flex-row">
@@ -128,8 +153,9 @@ export function StepCalendarBoard({
                 </div>
                 {weekDates.map((date) => {
                   const cellSessions = generation.sessions.filter((s) => {
-                    const sTime = formatTime(s.startAt);
-                    return s.startAt.slice(0, 10) === date && sTime === time;
+                    const localDate = toLocalDateStr(s.startAt);
+                    const localHour = toLocalHourLabel(s.startAt);
+                    return localDate === date && localHour === time;
                   });
 
                   return (
@@ -182,7 +208,7 @@ export function StepCalendarBoard({
           </h3>
           <div className="flex flex-col gap-2">
             {generation.sessions
-              .filter((s) => s.startAt.slice(0, 10) === today)
+              .filter((s) => toLocalDateStr(s.startAt) === today)
               .map((session) => (
                 <SessionCard
                   key={session.id}
@@ -192,7 +218,7 @@ export function StepCalendarBoard({
                   onReview={() => onReview(session.id)}
                 />
               ))}
-            {generation.sessions.filter((s) => s.startAt.slice(0, 10) === today)
+            {generation.sessions.filter((s) => toLocalDateStr(s.startAt) === today)
               .length === 0 ? (
               <p className="text-sm text-slate-500">今天没有学习日程。</p>
             ) : null}
