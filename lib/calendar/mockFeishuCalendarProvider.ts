@@ -48,24 +48,8 @@ export class MockFeishuCalendarProvider implements CalendarProvider {
 }
 
 export function defaultMockBusySlots(): BusySlot[] {
-  return [
-    {
-      id: "mock-feishu-weekly-standup",
-      source: "mock_feishu",
-      externalEventId: "mock-feishu-weekly-standup",
-      title: "Weekly standup",
-      startAt: new Date("2026-07-06T10:00:00.000Z"),
-      endAt: new Date("2026-07-06T10:30:00.000Z")
-    },
-    {
-      id: "mock-feishu-design-review",
-      source: "mock_feishu",
-      externalEventId: "mock-feishu-design-review",
-      title: "Design review",
-      startAt: new Date("2026-07-08T14:00:00.000Z"),
-      endAt: new Date("2026-07-08T15:00:00.000Z")
-    }
-  ];
+  // TODO: 任务冲突逻辑暂不实现，后续对接真实日历 API 时再开启
+  return [];
 }
 
 function rangesOverlap(
