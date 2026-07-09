@@ -9,8 +9,7 @@ import {
   serializeUserToken,
 } from "../feishu-oauth";
 
-const TOKEN_URL = "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token";
-const REFRESH_URL = "https://open.feishu.cn/open-apis/authen/v1/oidc/refresh_access_token";
+const TOKEN_URL = "https://open.feishu.cn/open-apis/authen/v2/oauth/token";
 
 function mockFetchResponse(body: unknown) {
   return vi.fn().mockResolvedValue({
@@ -32,7 +31,7 @@ describe("feishu-oauth", () => {
         state: "plan_1",
       });
 
-      expect(url).toContain("app_id=cli_test123");
+      expect(url).toContain("client_id=cli_test123");
       expect(url).toContain(
         "redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fauth%2Ffeishu%2Fcallback"
       );
@@ -54,18 +53,18 @@ describe("feishu-oauth", () => {
     it("应用 code 换取 user_access_token", async () => {
       const fakeFetch = mockFetchResponse({
         code: 0,
-        data: {
-          access_token: "u-test-token",
-          refresh_token: "ur-test-refresh",
-          expires_in: 6900,
-          token_type: "Bearer",
-        },
+        access_token: "u-test-token",
+        refresh_token: "ur-test-refresh",
+        expires_in: 6900,
+        token_type: "Bearer",
       });
       vi.stubGlobal("fetch", fakeFetch);
 
       const result = await exchangeCodeForUserToken({
         code: "auth_code_123",
-        tenantAccessToken: "t-tenant-token",
+        appId: "cli_test",
+        appSecret: "secret123",
+        redirectUri: "http://localhost:3000/api/auth/feishu/callback",
       });
 
       expect(result.accessToken).toBe("u-test-token");
@@ -78,21 +77,19 @@ describe("feishu-oauth", () => {
       expect(fakeFetch).toHaveBeenCalledWith(TOKEN_URL, {
         method: "POST",
         headers: {
-          Authorization: "Bearer t-tenant-token",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           grant_type: "authorization_code",
+          client_id: "cli_test",
+          client_secret: "secret123",
           code: "auth_code_123",
+          redirect_uri: "http://localhost:3000/api/auth/feishu/callback",
         }),
       });
     });
 
     it("飞书 API 报错时抛出异常", async () => {
-      mockFetchResponse({
-        code: 10001,
-        msg: "invalid code",
-      });
       vi.stubGlobal("fetch", mockFetchResponse({
         code: 10001,
         msg: "invalid code",
@@ -101,7 +98,9 @@ describe("feishu-oauth", () => {
       await expect(
         exchangeCodeForUserToken({
           code: "bad_code",
-          tenantAccessToken: "t-token",
+          appId: "cli_test",
+          appSecret: "secret123",
+          redirectUri: "http://localhost:3000/callback",
         })
       ).rejects.toThrow("飞书 OAuth2 换取 user_access_token 失败");
     });
@@ -111,30 +110,30 @@ describe("feishu-oauth", () => {
     it("应用 refresh_token 刷新 token", async () => {
       const fakeFetch = mockFetchResponse({
         code: 0,
-        data: {
-          access_token: "u-new-token",
-          refresh_token: "ur-new-refresh",
-          expires_in: 6900,
-        },
+        access_token: "u-new-token",
+        refresh_token: "ur-new-refresh",
+        expires_in: 6900,
       });
       vi.stubGlobal("fetch", fakeFetch);
 
       const result = await refreshUserToken({
         refreshToken: "ur-old-refresh",
-        tenantAccessToken: "t-tenant-token",
+        appId: "cli_test",
+        appSecret: "secret123",
       });
 
       expect(result.accessToken).toBe("u-new-token");
       expect(result.refreshToken).toBe("ur-new-refresh");
 
-      expect(fakeFetch).toHaveBeenCalledWith(REFRESH_URL, {
+      expect(fakeFetch).toHaveBeenCalledWith(TOKEN_URL, {
         method: "POST",
         headers: {
-          Authorization: "Bearer t-tenant-token",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           grant_type: "refresh_token",
+          client_id: "cli_test",
+          client_secret: "secret123",
           refresh_token: "ur-old-refresh",
         }),
       });
