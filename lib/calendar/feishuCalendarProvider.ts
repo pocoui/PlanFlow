@@ -94,14 +94,22 @@ export class FeishuCalendarProvider implements CalendarProvider {
     const token = await this.deps.getToken();
     const calendarId = await this.deps.getCalendarId();
 
+    const startTimestamp = toFeishuTimestamp(input.startAt);
+    const endTimestamp = toFeishuTimestamp(input.endAt);
+
+    console.log(
+      `[feishu] createEvent: calendarId=${calendarId}, title="${input.title}", ` +
+      `start=${input.startAt.toISOString()} (${startTimestamp}), end=${input.endAt.toISOString()} (${endTimestamp})`
+    );
+
     const body: Record<string, unknown> = {
       summary: input.title,
       start_time: {
-        timestamp: toFeishuTimestamp(input.startAt),
+        timestamp: startTimestamp,
         timezone: "Asia/Shanghai",
       },
       end_time: {
-        timestamp: toFeishuTimestamp(input.endAt),
+        timestamp: endTimestamp,
         timezone: "Asia/Shanghai",
       },
       visibility: "default",
@@ -126,6 +134,8 @@ export class FeishuCalendarProvider implements CalendarProvider {
     );
 
     const data = await response.json();
+    console.log(`[feishu] createEvent response: code=${data.code}, msg=${data.msg ?? "ok"}`);
+
     assertSuccess(data);
 
     const event = data.data.event;
