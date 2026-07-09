@@ -3,6 +3,7 @@ import type { BusySlot } from "@/packages/shared/src/availability-engine";
 import type {
   CalendarProvider,
   CreateCalendarEventInput,
+  DeleteCalendarEventInput,
   ExternalCalendarEvent,
   GetBusySlotsInput,
   UpdateCalendarEventInput
@@ -44,6 +45,11 @@ export class MockFeishuCalendarProvider implements CalendarProvider {
       startAt: new Date(input.startAt),
       endAt: new Date(input.endAt)
     };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async deleteCalendarEvent(_input: DeleteCalendarEventInput): Promise<void> {
+    // mock: no-op
   }
 }
 

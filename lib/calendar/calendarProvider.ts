@@ -17,6 +17,10 @@ export interface ExternalCalendarEvent extends DateTimeRange {
   description?: string;
 }
 
+export interface DeleteCalendarEventInput {
+  externalEventId: string;
+}
+
 export interface CalendarProvider {
   getBusySlots(input: GetBusySlotsInput): Promise<BusySlot[]>;
   createCalendarEvent(
@@ -25,4 +29,5 @@ export interface CalendarProvider {
   updateCalendarEvent(
     input: UpdateCalendarEventInput
   ): Promise<ExternalCalendarEvent>;
+  deleteCalendarEvent(input: DeleteCalendarEventInput): Promise<void>;
 }
