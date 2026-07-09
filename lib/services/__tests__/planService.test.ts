@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import type { CalendarProvider } from "@/lib/calendar/calendarProvider";
 
 import {
   exportPlanCalendarIcs,
@@ -10,6 +12,7 @@ import {
   getBusySlotsForPlan,
   getPlan,
   submitSessionReview,
+  syncSessionsToCalendar,
   updateSessionStatus,
   updateTaskStatus
 } from "../planService";
@@ -317,3 +320,166 @@ function validCreatePlanInput(
     ...overrides
   };
 }
+
+describe("syncSessionsToCalendar", () => {
+  it("应将所有未同步的 session 同步到日历", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await repository.createPlan({
+      userId: "u1",
+      title: "测试计划",
+      goal: "测试",
+      totalMinutes: 120,
+      startDate: new Date("2026-07-06"),
+      deadline: new Date("2026-07-12"),
+      rescheduleBufferMinutes: 15,
+      status: "draft",
+      availability: [
+        { weekday: 1, startTime: "09:00", endTime: "11:00" }
+      ]
+    });
+
+    // 添加 tasks 和 sessions
+    await repository.savePlanGeneration({
+      planId: plan.id,
+      tasks: [
+        {
+          id: "task1",
+          phase: "phase1",
+          title: "学习任务1",
+          description: "描述",
+          estimatedMinutes: 60,
+          priority: 1,
+          acceptanceCriteria: ["完成练习"],
+          orderIndex: 0
+        }
+      ],
+      sessions: [
+        {
+          taskId: "task1",
+          startAt: new Date("2026-07-06T09:00:00.000Z"),
+          endAt: new Date("2026-07-06T10:00:00.000Z"),
+          durationMinutes: 60,
+          status: "scheduled" as const
+        }
+      ],
+      busySlots: [],
+      warnings: []
+    });
+
+    // mock calendarProvider
+    const mockCalendarProvider = {
+      getBusySlots: vi.fn().mockResolvedValue([]),
+      createCalendarEvent: vi.fn().mockResolvedValue({
+        externalEventId: "feishu_evt_001",
+        title: "学习任务1",
+        description: "完成练习",
+        startAt: new Date("2026-07-06T09:00:00.000Z"),
+        endAt: new Date("2026-07-06T10:00:00.000Z")
+      }),
+      updateCalendarEvent: vi.fn().mockResolvedValue({}),
+      deleteCalendarEvent: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const result = await syncSessionsToCalendar(plan.id, {
+      repository,
+      calendarProvider: mockCalendarProvider as unknown as CalendarProvider
+    });
+
+    expect(result.syncedCount).toBe(1);
+    expect(result.skippedCount).toBe(0);
+    expect(result.failedCount).toBe(0);
+    expect(mockCalendarProvider.createCalendarEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("已同步的 session 应跳过不重复创建", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await repository.createPlan({
+      userId: "u1",
+      title: "测试计划",
+      goal: "测试",
+      totalMinutes: 120,
+      startDate: new Date("2026-07-06"),
+      deadline: new Date("2026-07-12"),
+      rescheduleBufferMinutes: 15,
+      status: "draft",
+      availability: [
+        { weekday: 1, startTime: "09:00", endTime: "11:00" }
+      ]
+    });
+
+    await repository.savePlanGeneration({
+      planId: plan.id,
+      tasks: [
+        {
+          id: "task1",
+          phase: "phase1",
+          title: "学习任务1",
+          description: "描述",
+          estimatedMinutes: 60,
+          priority: 1,
+          acceptanceCriteria: ["完成练习"],
+          orderIndex: 0
+        }
+      ],
+      sessions: [
+        {
+          taskId: "task1",
+          startAt: new Date("2026-07-06T09:00:00.000Z"),
+          endAt: new Date("2026-07-06T10:00:00.000Z"),
+          durationMinutes: 60,
+          status: "scheduled" as const
+        }
+      ],
+      busySlots: [],
+      warnings: []
+    });
+
+    // 模拟已经同步
+    const sessions = (await repository.getPlan(plan.id))!.sessions;
+    await repository.updateSessionExternalEventId(sessions[0].id, "feishu_evt_existing");
+
+    const mockCalendarProvider = {
+      getBusySlots: vi.fn().mockResolvedValue([]),
+      createCalendarEvent: vi.fn().mockResolvedValue({
+        externalEventId: "feishu_evt_new",
+        title: "学习任务1",
+        description: "",
+        startAt: new Date(),
+        endAt: new Date()
+      }),
+      updateCalendarEvent: vi.fn().mockResolvedValue({}),
+      deleteCalendarEvent: vi.fn().mockResolvedValue(undefined)
+    };
+
+    const result = await syncSessionsToCalendar(plan.id, {
+      repository,
+      calendarProvider: mockCalendarProvider as unknown as CalendarProvider
+    });
+
+    expect(result.syncedCount).toBe(0);
+    expect(result.skippedCount).toBe(1);
+    expect(mockCalendarProvider.createCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  it("无 scheduled session 时应返回空结果", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await repository.createPlan({
+      userId: "u1",
+      title: "空计划",
+      goal: "无任务",
+      totalMinutes: 120,
+      startDate: new Date("2026-07-06"),
+      deadline: new Date("2026-07-12"),
+      rescheduleBufferMinutes: 15,
+      status: "draft",
+      availability: [
+        { weekday: 1, startTime: "09:00", endTime: "11:00" }
+      ]
+    });
+
+    const result = await syncSessionsToCalendar(plan.id, { repository });
+
+    expect(result.totalSessions).toBe(0);
+    expect(result.syncedCount).toBe(0);
+  });
+});

@@ -84,6 +84,7 @@ export interface ScheduledSessionRecord extends Omit<ScheduledSession, "status">
   id: string;
   planId: string;
   status: SessionStatus;
+  externalEventId?: string;
 }
 
 export interface BusySlotRecord extends BusySlot {
@@ -148,6 +149,10 @@ export interface PlanRepository {
   ): Promise<ScheduledSessionRecord>;
   getSessionContext(sessionId: string): Promise<SessionReviewContext | null>;
   saveSessionReview(input: SaveSessionReviewInput): Promise<SubmitSessionReviewResult>;
+  updateSessionExternalEventId(
+    sessionId: string,
+    externalEventId: string
+  ): Promise<ScheduledSessionRecord>;
 }
 
 export interface PlanServiceDependencies {
@@ -485,6 +490,84 @@ export async function exportPlanCalendarIcs(
   return buildIcsCalendar(plan, exportableSessions);
 }
 
+export interface SyncCalendarResult {
+  totalSessions: number;
+  syncedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  errors: Array<{ sessionId: string; reason: string }>;
+}
+
+export async function syncSessionsToCalendar(
+  planId: string,
+  dependencies: PlanServiceDependencies = {}
+): Promise<SyncCalendarResult> {
+  const repository = dependencies.repository ?? createPrismaPlanRepository();
+  const calendarProvider =
+    dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
+
+  const plan = await requirePlan(planId, repository);
+  const taskById = new Map(plan.tasks.map((t) => [t.id, t]));
+  const scheduledSessions = plan.sessions.filter(
+    (s) => s.status === "scheduled"
+  );
+
+  if (scheduledSessions.length === 0) {
+    return {
+      totalSessions: 0,
+      syncedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      errors: []
+    };
+  }
+
+  let syncedCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+  const errors: Array<{ sessionId: string; reason: string }> = [];
+
+  for (const session of scheduledSessions) {
+    const task = taskById.get(session.taskId);
+    const title = task?.title ?? "学习日程";
+    const description = task?.acceptanceCriteria?.join("; ") ?? "";
+
+    try {
+      if (!session.externalEventId) {
+        // 新建日程
+        const event = await calendarProvider.createCalendarEvent({
+          title,
+          description,
+          startAt: session.startAt,
+          endAt: session.endAt
+        });
+        await repository.updateSessionExternalEventId(
+          session.id,
+          event.externalEventId
+        );
+        syncedCount++;
+      } else {
+        // 已同步，跳过
+        skippedCount++;
+      }
+    } catch (error) {
+      failedCount++;
+      errors.push({
+        sessionId: session.id,
+        reason: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  return {
+    totalSessions: scheduledSessions.length,
+    syncedCount,
+    skippedCount,
+    failedCount,
+    errors
+  };
+}
+
 export function createInMemoryPlanRepository(): PlanRepository {
   const plans = new Map<string, PlanRecord>();
 
@@ -706,6 +789,21 @@ export function createInMemoryPlanRepository(): PlanRepository {
         rescheduledSessions: rescheduledSessions.map(copySession),
         warnings: input.warnings
       };
+    },
+    async updateSessionExternalEventId(sessionId, externalEventId) {
+      for (const plan of plans.values()) {
+        const session = plan.sessions.find((item) => item.id === sessionId);
+
+        if (session) {
+          session.externalEventId = externalEventId;
+          plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
+          plans.set(plan.id, clonePlan(plan));
+
+          return copySession(session);
+        }
+      }
+
+      throw new PlanServiceError("NOT_FOUND", "Session not found.");
     }
   };
 }
@@ -1034,6 +1132,19 @@ export function createPrismaPlanRepository(): PlanRepository {
         rescheduledSessions: result.rescheduledSessions.map(mapPrismaSession),
         warnings: input.warnings
       };
+    },
+    async updateSessionExternalEventId(sessionId, externalEventId) {
+      try {
+        const session = await prisma.scheduledSession.update({
+          where: { id: sessionId },
+          data: { externalEventId }
+        });
+
+        return mapPrismaSession(session);
+      } catch (error) {
+        throwNotFoundForMissingRecord(error, "Session not found.");
+        throw error;
+      }
     }
   };
 }
@@ -1320,6 +1431,7 @@ interface PrismaPlanShape {
     endAt: Date;
     durationMinutes: number;
     status: string;
+    externalEventId: string | null;
   }>;
   busySlots: Array<{
     id: string;
@@ -1391,6 +1503,7 @@ function mapPrismaSession(session: {
   endAt: Date;
   durationMinutes: number;
   status: string;
+  externalEventId: string | null;
 }): ScheduledSessionRecord {
   return {
     id: session.id,
@@ -1399,7 +1512,8 @@ function mapPrismaSession(session: {
     startAt: session.startAt,
     endAt: session.endAt,
     durationMinutes: session.durationMinutes,
-    status: session.status as SessionStatus
+    status: session.status as SessionStatus,
+    externalEventId: session.externalEventId ?? undefined
   };
 }
 
