@@ -54,10 +54,10 @@ export function createCalendarProvider(
         }
         // 尝试刷新
         try {
-          const tenantToken = await tokenManager.getToken();
           userToken = await refreshUserToken({
             refreshToken: userToken.refreshToken,
-            tenantAccessToken: tenantToken,
+            appId,
+            appSecret,
           });
           return userToken.accessToken;
         } catch {

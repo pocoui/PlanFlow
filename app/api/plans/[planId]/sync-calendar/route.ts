@@ -17,7 +17,9 @@ export async function POST(request: Request, context: RouteContext) {
 
     // 从 cookie 中读取飞书用户 token
     const cookieHeader = request.headers.get("cookie") ?? "";
+    console.log("[sync-calendar] cookie header:", cookieHeader.substring(0, 200));
     const userTokenCookie = parseCookieValue(cookieHeader, "feishu_user_token");
+    console.log("[sync-calendar] userTokenCookie found:", !!userTokenCookie, userTokenCookie ? userTokenCookie.substring(0, 80) : "null");
 
     // 未授权时返回授权 URL，前端据此跳转
     if (!hasUserAccessToken(userTokenCookie)) {
@@ -69,5 +71,12 @@ function parseCookieValue(cookieHeader: string, key: string): string | undefined
     .split(";")
     .map((s) => s.trim())
     .find((s) => s.startsWith(`${key}=`));
-  return match?.slice(key.length + 1);
+  if (!match) return undefined;
+  const raw = match.slice(key.length + 1);
+  // cookies.set 会自动编码，浏览器发送时保持编码状态，需要手动解码
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
