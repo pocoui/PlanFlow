@@ -182,6 +182,67 @@ export function buildCalendarExportUrl(planId: string): string {
   return `/api/plans/${planId}/calendar.ics`;
 }
 
+export interface SyncCalendarResult {
+  totalSessions: number;
+  syncedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  errors: Array<{ sessionId: string; reason: string }>;
+}
+
+/** 同步到日历时可能需要跳转飞书授权 */
+export interface SyncCalendarError {
+  code: string;
+  message: string;
+  details?: {
+    authorizeUrl?: string;
+  };
+}
+
+/** 需要飞书授权时抛出此错误，包含授权 URL */
+export class FeishuAuthRequiredError extends Error {
+  public readonly authorizeUrl: string;
+  public readonly isFeishuAuthRequired = true;
+  constructor(authorizeUrl: string) {
+    super("FEISHU_AUTH_REQUIRED");
+    this.name = "FeishuAuthRequiredError";
+    this.authorizeUrl = authorizeUrl;
+  }
+}
+
+/** 类型守卫：判断错误是否为飞书授权需求 */
+export function isFeishuAuthRequired(error: unknown): error is FeishuAuthRequiredError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "isFeishuAuthRequired" in error &&
+    (error as FeishuAuthRequiredError).isFeishuAuthRequired === true
+  );
+}
+
+export async function syncToCalendar(
+  planId: string,
+  fetcher: DashboardFetcher = fetch
+): Promise<SyncCalendarResult> {
+  const response = await fetcher(`/api/plans/${planId}/sync-calendar`, {
+    method: "POST"
+  });
+
+  if (response.status === 401) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: SyncCalendarError;
+    } | null;
+    const error = body?.error;
+    if (error?.code === "FEISHU_AUTH_REQUIRED" && error.details?.authorizeUrl) {
+      throw new FeishuAuthRequiredError(error.details.authorizeUrl);
+    }
+    throw new Error(error?.message ?? "请先授权飞书账号");
+  }
+
+  const json = await parseJsonResponse(response) as { data: SyncCalendarResult };
+  return json.data;
+}
+
 function getSessionMinutes(session: DashboardSession): number {
   if (typeof session.durationMinutes === "number") {
     return session.durationMinutes;

@@ -4,6 +4,8 @@ import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Download,
   LayoutGrid,
@@ -11,6 +13,7 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
+  Upload,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,10 +22,12 @@ import {
   buildCalendarExportUrl,
   fetchPlanDashboard,
   groupSessionsByDate,
+  isFeishuAuthRequired,
   markSessionCompleted,
   markTaskCompleted,
   submitSessionReview,
-  summarizeGeneratedPlan
+  summarizeGeneratedPlan,
+  syncToCalendar
 } from "@/lib/client/planDashboard";
 import type {
   DashboardBusySlot,
@@ -70,6 +75,10 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
   const [message, setMessage] = useState("");
   const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
   const [weekViewMode, setWeekViewMode] = useState<WeekViewMode>("list");
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [weekOffsetInitialized, setWeekOffsetInitialized] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [authDialogUrl, setAuthDialogUrl] = useState<string | null>(null);
 
   const loadPlan = useCallback(async () => {
     setViewState("loading");
@@ -118,6 +127,26 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
   const todayD = new Date();
   const todayPad = (n: number) => String(n).padStart(2, "0");
   const today = `${todayD.getFullYear()}-${todayPad(todayD.getMonth() + 1)}-${todayPad(todayD.getDate())}`;
+
+  // 计算当前周的周一（周一为一周的开始）
+  const currentWeekMonday = useMemo(() => {
+    const d = new Date(today);
+    const day = d.getDay(); // 0=周日, 1=周一, ..., 6=周六
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+  }, [today]);
+
+  // 初始化 weekOffset 为当前周相对于第一个 session 所在周的偏移
+  useEffect(() => {
+    if (!weekOffsetInitialized && groupedSessions.length > 0) {
+      const firstDate = groupedSessions[0].date;
+      const baseMonday = getMonday(firstDate);
+      const diffDays = Math.round((currentWeekMonday.getTime() - baseMonday.getTime()) / (1000 * 60 * 60 * 24));
+      const offset = Math.floor(diffDays / 7);
+      setWeekOffset(offset);
+      setWeekOffsetInitialized(true);
+    }
+  }, [groupedSessions, currentWeekMonday, weekOffsetInitialized]);
 
   const todaySessions = sessions.filter(
     (s) => {
@@ -206,6 +235,33 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
     }
   }
 
+  async function handleSyncCalendar() {
+    setSyncing(true);
+    setMessage("");
+    try {
+      const result = await syncToCalendar(planId);
+      if (result.failedCount > 0) {
+        setMessage(
+          `同步完成：成功 ${result.syncedCount} 个，跳过 ${result.skippedCount} 个，失败 ${result.failedCount} 个`
+        );
+      } else if (result.syncedCount > 0) {
+        setMessage(`已同步 ${result.syncedCount} 个日程到飞书日历。`);
+      } else {
+        setMessage("所有日程已同步，无需重复操作。");
+      }
+    } catch (error) {
+      console.log("[sync-calendar] catch error:", error, "isFeishuAuthRequired:", isFeishuAuthRequired(error));
+      if (isFeishuAuthRequired(error)) {
+        // 弹出授权确认框
+        setAuthDialogUrl(error.authorizeUrl);
+        return;
+      }
+      setMessage(error instanceof Error ? error.message : "同步失败，请稍后重试。");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (viewState === "loading") {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -269,6 +325,15 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
           <Download className="h-4 w-4" />
           导出 .ics
         </a>
+        <button
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={syncing}
+          type="button"
+          onClick={handleSyncCalendar}
+        >
+          {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {syncing ? "同步中..." : "同步到飞书日历"}
+        </button>
         <button
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-slate-800 transition hover:border-primary"
           type="button"
@@ -400,7 +465,8 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
             groupedBusySlots={groupedBusySlots}
             today={today}
             taskTitleById={taskTitleById}
-            onCompleteSession={completeSession}
+            weekOffset={weekOffset}
+            onWeekChange={setWeekOffset}
             onReviewSession={(id) => setReviewSessionId(id)}
           />
         )}
@@ -463,6 +529,13 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
           onSubmit={handleReviewSubmit}
         />
       ) : null}
+
+      {authDialogUrl ? (
+        <FeishuAuthDialog
+          authorizeUrl={authDialogUrl}
+          onClose={() => setAuthDialogUrl(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -488,18 +561,6 @@ function getMonday(dateStr: string): Date {
   return new Date(d.setDate(diff));
 }
 
-// 生成从周一开始的 7 天日期
-function generateWeekDates(monday: Date): string[] {
-  const dates: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    dates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-  }
-  return dates;
-}
-
 // 生成连续小时时间槽
 function generateHourSlots(startHour: number, endHour: number): string[] {
   const slots: string[] = [];
@@ -516,24 +577,54 @@ function WeekCalendarView({
   groupedBusySlots,
   today,
   taskTitleById,
+  weekOffset,
+  onWeekChange,
   onReviewSession
 }: {
   groupedSessions: { date: string; sessions: DashboardSession[] }[];
   groupedBusySlots: { date: string; slots: DashboardBusySlot[] }[];
   today: string;
   taskTitleById: Map<string, string>;
+  weekOffset: number;
+  onWeekChange: (offset: number) => void;
   onReviewSession: (id: string) => void;
 }) {
-  // 收集所有日期，生成完整的周视图
+  // 根据 weekOffset 计算当前周的周一，生成 7 天
   const weekDates = useMemo(() => {
     if (groupedSessions.length === 0) return [];
     const firstDate = groupedSessions[0].date;
-    const monday = getMonday(firstDate);
-    return generateWeekDates(monday);
-  }, [groupedSessions]);
+    const baseMonday = getMonday(firstDate);
+    // 根据偏移量计算目标周的周一
+    const targetMonday = new Date(baseMonday);
+    targetMonday.setDate(baseMonday.getDate() + weekOffset * 7);
+    // 生成 7 天（周一到周日）
+    const dates: string[] = [];
+    const pad = (n: number) => String(n).padStart(2, "0");
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(targetMonday);
+      d.setDate(targetMonday.getDate() + i);
+      dates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    }
+    return dates;
+  }, [groupedSessions, weekOffset]);
 
-  // 固定 08:00 - 22:00
-  const timeSlots = useMemo(() => generateHourSlots(8, 22), []);
+  // 动态计算时间范围，覆盖所有 session
+  const timeSlots = useMemo(() => {
+    if (groupedSessions.length === 0) return generateHourSlots(8, 22);
+    let minHour = 24;
+    let maxHour = 0;
+    for (const group of groupedSessions) {
+      for (const session of group.sessions) {
+        const hour = new Date(session.startAt).getHours();
+        if (hour < minHour) minHour = hour;
+        if (hour > maxHour) maxHour = hour;
+      }
+    }
+    // 确保至少覆盖 08:00-22:00
+    minHour = Math.min(minHour, 8);
+    maxHour = Math.max(maxHour, 22);
+    return generateHourSlots(minHour, maxHour);
+  }, [groupedSessions]);
 
   // 按日期+小时分组 sessions
   const sessionsByDateAndHour = useMemo(() => {
@@ -576,6 +667,34 @@ function WeekCalendarView({
   return (
     <div className="overflow-x-auto rounded-lg border border-border bg-white">
       <div className="min-w-[700px]">
+        {/* 周导航栏 */}
+        <div className="flex items-center justify-between border-b border-border bg-slate-50 px-3 py-2">
+          <button
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 text-xs font-medium text-slate-700 transition hover:border-primary hover:text-primary"
+            type="button"
+            onClick={() => onWeekChange(weekOffset - 1)}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            上一周
+          </button>
+          <span className="text-sm font-semibold text-slate-800">
+            {weekDates.length > 0 && (() => {
+              const first = new Date(weekDates[0]);
+              const last = new Date(weekDates[6]);
+              const fmt = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日`;
+              return `${fmt(first)} - ${fmt(last)}`;
+            })()}
+          </span>
+          <button
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 text-xs font-medium text-slate-700 transition hover:border-primary hover:text-primary"
+            type="button"
+            onClick={() => onWeekChange(weekOffset + 1)}
+          >
+            下一周
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
         {/* 表头 */}
         <div className="grid grid-cols-8 border-b border-border bg-slate-50 text-xs font-semibold text-slate-600">
           <div className="border-r border-border p-2 text-center">时间</div>
@@ -915,6 +1034,45 @@ function ReviewDialog({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function FeishuAuthDialog({
+  authorizeUrl,
+  onClose
+}: {
+  authorizeUrl: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="mx-4 w-full max-w-sm rounded-lg border border-border bg-white p-5 shadow-xl">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
+            <Upload className="h-5 w-5 text-white" />
+          </div>
+          <h3 className="text-lg font-semibold">同步到飞书日历</h3>
+        </div>
+        <p className="mb-5 text-sm text-slate-600">
+          同步日程需要授权你的飞书账号。点击确认后将跳转到飞书登录页面，授权完成后自动返回。
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            type="button"
+            onClick={onClose}
+          >
+            取消
+          </button>
+          <a
+            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primaryForeground transition hover:bg-teal-800"
+            href={authorizeUrl}
+          >
+            确认授权
+          </a>
+        </div>
       </div>
     </div>
   );
