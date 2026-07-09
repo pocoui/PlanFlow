@@ -2,15 +2,15 @@
  * 飞书 OAuth2 授权工具
  *
  * 实现思路：
- * - 飞书 OAuth2 流程：用户授权 → 回调获取 code → 用 code 换 user_access_token
+ * - 飞书 OAuth2 浏览器网页流程：用户授权 → 回调获取 code → 用 code 换 user_access_token
+ * - 使用 v2/oauth/token 接口（浏览器网页应用专用），通过 client_id + client_secret 换 token
+ * - v1/oidc/access_token 是小程序/后台应用用的，不适用浏览器网页场景
  * - user_access_token 代表用户身份，可以在用户个人日历上创建日程
- * - tenant_access_token 代表应用身份，仅能操作应用自己的日历
- * - 换 token 时需要 tenant_access_token 作为 Authorization header
  *
  * 对比 Vue3：类似 Vue3 中使用 Pinia 管理认证状态，这里用 cookie 持久化 token
  */
 
-const FEISHU_AUTH_BASE = "https://open.feishu.cn/open-apis/authen/v1";
+const FEISHU_AUTH_BASE = "https://open.feishu.cn/open-apis/authen";
 
 export interface FeishuUserToken {
   accessToken: string;
@@ -21,41 +21,54 @@ export interface FeishuUserToken {
 
 /**
  * 构建飞书 OAuth2 授权 URL，用户点击后跳转到飞书登录授权页
+ *
+ * scope 参数用于请求用户授权特定权限，空格分隔
  */
 export function buildFeishuAuthorizeUrl(params: {
   appId: string;
   redirectUri: string;
   state?: string;
+  scope?: string;
 }): string {
-  const url = new URL(`${FEISHU_AUTH_BASE}/authorize`);
-  url.searchParams.set("app_id", params.appId);
+  const url = new URL("https://accounts.feishu.cn/open-apis/authen/v1/authorize");
+  url.searchParams.set("client_id", params.appId);
   url.searchParams.set("redirect_uri", params.redirectUri);
   url.searchParams.set("response_type", "code");
   if (params.state) {
     url.searchParams.set("state", params.state);
+  }
+  if (params.scope) {
+    url.searchParams.set("scope", params.scope);
   }
   return url.toString();
 }
 
 /**
  * 用授权码（code）换取 user_access_token
- * 注意：需要 tenant_access_token 作为 Authorization header
+ *
+ * 使用 v2/oauth/token 接口（浏览器网页应用专用），
+ * 通过 client_id + client_secret 认证，而非 tenant_access_token。
+ * 此接口能正确处理用户授权的 scope 权限。
  */
 export async function exchangeCodeForUserToken(params: {
   code: string;
-  tenantAccessToken: string;
+  appId: string;
+  appSecret: string;
+  redirectUri: string;
 }): Promise<FeishuUserToken> {
   const response = await fetch(
-    `${FEISHU_AUTH_BASE}/oidc/access_token`,
+    `${FEISHU_AUTH_BASE}/v2/oauth/token`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${params.tenantAccessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         grant_type: "authorization_code",
+        client_id: params.appId,
+        client_secret: params.appSecret,
         code: params.code,
+        redirect_uri: params.redirectUri,
       }),
     }
   );
@@ -68,33 +81,37 @@ export async function exchangeCodeForUserToken(params: {
     );
   }
 
-  const token = data.data;
+  // v2 接口的 token 字段直接在顶层，不在 data 嵌套下
   return {
-    accessToken: token.access_token,
-    refreshToken: token.refresh_token,
-    expiresIn: token.expires_in,
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresIn: data.expires_in,
     // 提前 5 分钟过期
-    expiresAt: Date.now() + (token.expires_in - 300) * 1000,
+    expiresAt: Date.now() + (data.expires_in - 300) * 1000,
   };
 }
 
 /**
  * 用 refresh_token 刷新 user_access_token
+ *
+ * 使用 v2/oauth/token 接口刷新
  */
 export async function refreshUserToken(params: {
   refreshToken: string;
-  tenantAccessToken: string;
+  appId: string;
+  appSecret: string;
 }): Promise<FeishuUserToken> {
   const response = await fetch(
-    `${FEISHU_AUTH_BASE}/oidc/refresh_access_token`,
+    `${FEISHU_AUTH_BASE}/v2/oauth/token`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${params.tenantAccessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         grant_type: "refresh_token",
+        client_id: params.appId,
+        client_secret: params.appSecret,
         refresh_token: params.refreshToken,
       }),
     }
@@ -108,12 +125,11 @@ export async function refreshUserToken(params: {
     );
   }
 
-  const token = data.data;
   return {
-    accessToken: token.access_token,
-    refreshToken: token.refresh_token,
-    expiresIn: token.expires_in,
-    expiresAt: Date.now() + (token.expires_in - 300) * 1000,
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresIn: data.expires_in,
+    expiresAt: Date.now() + (data.expires_in - 300) * 1000,
   };
 }
 

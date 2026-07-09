@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     appId,
     redirectUri,
     state: planId,
+    // 用户授权权限：calendar:calendar 包含日历读写，offline_access 用于刷新 token
+    scope: "calendar:calendar offline_access",
   });
 
   return NextResponse.redirect(authorizeUrl);

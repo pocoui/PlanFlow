@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { FeishuTokenManager } from "@/lib/calendar/feishuTokenManager";
 import {
   exchangeCodeForUserToken,
   serializeUserToken,
@@ -10,9 +9,9 @@ import {
  * GET /api/auth/feishu/callback
  *
  * 飞书 OAuth2 授权回调，飞书会带上 code 和 state 参数。
- * 1. 用 code 换取 user_access_token
+ * 1. 用 code 换取 user_access_token（v2/oauth/token 接口）
  * 2. 将 token 存入 cookie（feishu_user_token）
- * 3. 重定向回计划详情页
+ * 3. 重定向回仪表盘页面
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -38,14 +37,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 先获取 tenant_access_token，换 user_access_token 时需要
-    const tokenManager = new FeishuTokenManager({ appId, appSecret });
-    const tenantAccessToken = await tokenManager.getToken();
+    const redirectUri = `${origin}/api/auth/feishu/callback`;
 
-    // 用 code 换 user_access_token
+    // 使用 v2/oauth/token 接口，用 client_id + client_secret 换取 user_access_token
     const userToken = await exchangeCodeForUserToken({
       code,
-      tenantAccessToken,
+      appId,
+      appSecret,
+      redirectUri,
     });
 
     // 重定向回仪表盘页面（planId 作为查询参数），同时设置 cookie
@@ -55,6 +54,7 @@ export async function GET(request: Request) {
     const response = NextResponse.redirect(redirectUrl);
 
     // 将 token 存入 cookie，有效期与 refresh_token 一致（30 天）
+    // cookies.set 会自动编码，不需要手动 encodeURIComponent
     response.cookies.set("feishu_user_token", serializeUserToken(userToken), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
