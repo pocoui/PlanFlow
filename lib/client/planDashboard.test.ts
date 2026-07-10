@@ -123,7 +123,8 @@ function generation(): DashboardGeneration {
         startAt: "2026-07-06T09:00:00.000Z",
         endAt: "2026-07-06T10:30:00.000Z",
         durationMinutes: 90,
-        status: "scheduled"
+        status: "scheduled",
+        hasReview: false
       },
       {
         id: "session_2",
@@ -131,7 +132,8 @@ function generation(): DashboardGeneration {
         startAt: "2026-07-08T09:00:00.000Z",
         endAt: "2026-07-08T10:00:00.000Z",
         durationMinutes: 60,
-        status: "scheduled"
+        status: "scheduled",
+        hasReview: false
       }
     ],
     busySlots: [

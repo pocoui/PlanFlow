@@ -237,6 +237,43 @@ describe("planService", () => {
     );
   });
 
+  it("returns hasReview=false for completed session without review", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createGeneratedPlan(repository);
+    const session = plan.sessions[0];
+
+    await updateSessionStatus(session.id, "completed", { repository });
+    const details = await getPlan(plan.id, { repository });
+    const updated = details.sessions.find((item) => item.id === session.id);
+
+    expect(updated).toBeDefined();
+    expect(updated!.hasReview).toBe(false);
+  });
+
+  it("returns hasReview=true for completed session with review", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createGeneratedPlan(repository);
+    const session = plan.sessions[0];
+
+    await updateSessionStatus(session.id, "completed", { repository });
+    await submitSessionReview(
+      session.id,
+      {
+        result: "completed",
+        actualMinutes: session.durationMinutes,
+        remainingMinutes: 0,
+        reason: "",
+        continueTask: false
+      },
+      { repository }
+    );
+    const details = await getPlan(plan.id, { repository });
+    const updated = details.sessions.find((item) => item.id === session.id);
+
+    expect(updated).toBeDefined();
+    expect(updated!.hasReview).toBe(true);
+  });
+
   it("returns busy slots for a plan date range", async () => {
     const repository = createInMemoryPlanRepository();
     const plan = await createPlan(

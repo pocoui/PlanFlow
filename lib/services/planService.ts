@@ -85,6 +85,7 @@ export interface ScheduledSessionRecord extends Omit<ScheduledSession, "status">
   planId: string;
   status: SessionStatus;
   externalEventId?: string;
+  hasReview: boolean;
 }
 
 export interface BusySlotRecord extends BusySlot {
@@ -624,7 +625,8 @@ export function createInMemoryPlanRepository(): PlanRepository {
         ...session,
         id: nextId("session"),
         planId: input.planId,
-        status: session.status
+        status: session.status,
+        hasReview: false
       }));
       const busySlots = input.busySlots.map((slot) => ({
         ...slot,
@@ -680,7 +682,8 @@ export function createInMemoryPlanRepository(): PlanRepository {
         ...session,
         id: nextId("session"),
         planId: input.planId,
-        status: session.status
+        status: session.status,
+        hasReview: false
       }));
       const busySlots = input.busySlots.map((slot) => ({
         ...slot,
@@ -772,11 +775,13 @@ export function createInMemoryPlanRepository(): PlanRepository {
       }
 
       session.status = input.originalSessionStatus;
+      session.hasReview = true;
       const rescheduledSessions = input.rescheduledSessions.map((item) => ({
         ...item,
         id: nextId("session"),
         planId: input.planId,
-        status: item.status
+        status: item.status,
+        hasReview: false
       }));
       plan.sessions.push(...rescheduledSessions);
       plan.updatedAt = new Date("2026-07-04T00:00:00.000Z");
@@ -1388,7 +1393,13 @@ function copySession(session: ScheduledSessionRecord): ScheduledSessionRecord {
 const planInclude = {
   availability: true,
   tasks: true,
-  sessions: true,
+  sessions: {
+    include: {
+      review: {
+        select: { id: true }
+      }
+    }
+  },
   busySlots: true
 } as const;
 
@@ -1432,6 +1443,7 @@ interface PrismaPlanShape {
     durationMinutes: number;
     status: string;
     externalEventId: string | null;
+    review?: { id: string } | null;
   }>;
   busySlots: Array<{
     id: string;
@@ -1504,6 +1516,7 @@ function mapPrismaSession(session: {
   durationMinutes: number;
   status: string;
   externalEventId: string | null;
+  review?: { id: string } | null;
 }): ScheduledSessionRecord {
   return {
     id: session.id,
@@ -1513,7 +1526,8 @@ function mapPrismaSession(session: {
     endAt: session.endAt,
     durationMinutes: session.durationMinutes,
     status: session.status as SessionStatus,
-    externalEventId: session.externalEventId ?? undefined
+    externalEventId: session.externalEventId ?? undefined,
+    hasReview: session.review !== undefined ? session.review !== null : false
   };
 }
 

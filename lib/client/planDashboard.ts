@@ -14,6 +14,7 @@ export interface DashboardSession {
   endAt: string;
   durationMinutes?: number;
   status: string;
+  hasReview: boolean;
 }
 
 export interface DashboardBusySlot {

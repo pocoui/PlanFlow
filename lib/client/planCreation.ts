@@ -50,6 +50,7 @@ export interface GeneratePlanResponse {
     endAt: string;
     durationMinutes?: number;
     status: string;
+    hasReview: boolean;
   }>;
   busySlots: Array<{
     id: string;
