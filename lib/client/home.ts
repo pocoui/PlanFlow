@@ -1,3 +1,4 @@
+import { fetchPlanDashboard } from "./planDashboard";
 import type { DashboardPlan, DashboardSession } from "./planDashboard";
 
 export interface HomeData {
@@ -20,6 +21,7 @@ export interface HomePlanSummary {
     taskTitle: string;
     startAt: string;
     endAt: string;
+    isInProgress: boolean;
   } | null;
 }
 
@@ -51,7 +53,9 @@ export function aggregateHomeData(
   options: { now?: Date; partialFailure?: boolean } = {}
 ): HomeData {
   const now = options.now ?? new Date();
-  const generatedPlans = plans.filter((plan) => plan.status === "generated");
+  const generatedPlans = plans
+    .filter((plan) => plan.status === "generated")
+    .sort((a, b) => sortByCreatedAtDesc(a, b));
 
   if (generatedPlans.length === 0) {
     return {
@@ -157,7 +161,7 @@ function findNextSession(
   taskById: Map<string, DashboardPlan["tasks"][number]>,
   now: Date
 ): HomePlanSummary["nextSession"] {
-  const upcoming = plan.sessions
+  const eligible = plan.sessions
     .filter(
       (session) =>
         (session.status === "scheduled" || session.status === "conflicted") &&
@@ -167,7 +171,12 @@ function findNextSession(
       (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
     );
 
-  const session = upcoming[0];
+  const inProgress = eligible.find((session) => {
+    const startAt = new Date(session.startAt).getTime();
+    return startAt <= now.getTime();
+  });
+
+  const session = inProgress ?? eligible[0];
   if (!session) return null;
 
   const task = taskById.get(session.taskId);
@@ -175,7 +184,8 @@ function findNextSession(
     id: session.id,
     taskTitle: task?.title ?? "学习日程",
     startAt: session.startAt,
-    endAt: session.endAt
+    endAt: session.endAt,
+    isInProgress: inProgress === session
   };
 }
 
@@ -192,8 +202,69 @@ function getSessionMinutes(session: DashboardSession): number {
   );
 }
 
+export interface FetchHomeDataOptions {
+  retryPlanIds?: string[];
+  existingPlans?: DashboardPlan[];
+}
+
+export async function fetchHomeData(
+  options: FetchHomeDataOptions = {}
+): Promise<HomeData & { failedPlanIds: string[]; fetchedPlans: DashboardPlan[] }> {
+  const listResponse = await fetch("/api/plans");
+  if (!listResponse.ok) {
+    throw new Error("加载计划列表失败");
+  }
+  const plans = (await listResponse.json()) as Array<{ id: string; status: string }>;
+
+  if (plans.length === 0) {
+    return {
+      hasPlans: false,
+      failedPlanIds: [],
+      fetchedPlans: [],
+      plans: [],
+      todaySessions: [],
+      pendingAlerts: []
+    };
+  }
+
+  const generatedPlans = plans.filter((p) => p.status === "generated");
+  const plansToFetch = options.retryPlanIds
+    ? generatedPlans.filter((p) => options.retryPlanIds!.includes(p.id))
+    : generatedPlans;
+
+  const detailResults = await Promise.allSettled(
+    plansToFetch.map((p) => fetchPlanDashboard(p.id))
+  );
+
+  const fulfilledPlans = detailResults
+    .map((r) => (r.status === "fulfilled" ? r.value : null))
+    .filter((p): p is DashboardPlan => p !== null);
+
+  const failedPlanIds = plansToFetch
+    .map((p, index) => (detailResults[index].status === "rejected" ? p.id : null))
+    .filter((id): id is string => id !== null);
+
+  // 重试时合并已有的成功计划数据，避免覆盖
+  const existingPlans = options.existingPlans?.filter(
+    (p) => !failedPlanIds.includes(p.id)
+  );
+  const allPlans = [...(existingPlans ?? []), ...fulfilledPlans];
+
+  const homeData = aggregateHomeData(allPlans, {
+    partialFailure: failedPlanIds.length > 0
+  });
+
+  return { ...homeData, failedPlanIds, fetchedPlans: allPlans };
+}
+
 function formatLocalDate(value: string | Date): string {
   const d = value instanceof Date ? value : new Date(value);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function sortByCreatedAtDesc(a: DashboardPlan, b: DashboardPlan): number {
+  const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  return bTime - aTime;
 }

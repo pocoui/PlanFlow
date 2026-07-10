@@ -9,6 +9,9 @@
  *   4. 枚举类型是否正确注册
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-unused-expressions */
+
 const fs = require("fs");
 const path = require("path");
 const { PrismaClient } = require("@prisma/client");

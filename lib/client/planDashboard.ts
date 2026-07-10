@@ -118,14 +118,22 @@ export async function markTaskCompleted(
   taskId: string,
   fetcher: DashboardFetcher = fetch
 ): Promise<{ id: string; status: string }> {
-  return patchStatus(`/api/tasks/${taskId}/status`, fetcher);
+  return patchStatus(`/api/tasks/${taskId}/status`, "completed", fetcher);
 }
 
 export async function markSessionCompleted(
   sessionId: string,
   fetcher: DashboardFetcher = fetch
 ): Promise<{ id: string; status: string }> {
-  return patchStatus(`/api/sessions/${sessionId}/status`, fetcher);
+  return patchStatus(`/api/sessions/${sessionId}/status`, "completed", fetcher);
+}
+
+export async function markSessionStatus(
+  sessionId: string,
+  status: "completed" | "missed",
+  fetcher: DashboardFetcher = fetch
+): Promise<{ id: string; status: string }> {
+  return patchStatus(`/api/sessions/${sessionId}/status`, status, fetcher);
 }
 
 export async function submitSessionReview(
@@ -158,6 +166,8 @@ export interface DashboardPlan {
   startDate: string;
   deadline: string;
   status: string;
+  createdAt?: string;
+  updatedAt?: string;
   tasks: DashboardTask[];
   sessions: DashboardSession[];
   busySlots: DashboardBusySlot[];
@@ -260,6 +270,7 @@ function getSessionMinutes(session: DashboardSession): number {
 
 async function patchStatus(
   url: string,
+  status: string,
   fetcher: DashboardFetcher
 ): Promise<{ id: string; status: string }> {
   const response = await fetcher(url, {
@@ -267,7 +278,7 @@ async function patchStatus(
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ status: "completed" })
+    body: JSON.stringify({ status })
   });
 
   return parseJsonResponse(response);

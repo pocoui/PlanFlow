@@ -125,7 +125,7 @@ export function StepCalendarBoard({
       dateMap.get(hour)!.push(session);
     }
     return map;
-  }, [generation.sessions]);
+  }, [generation]);
 
   return (
     <section className="flex flex-col gap-5 lg:flex-row">
