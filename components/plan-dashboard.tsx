@@ -63,17 +63,18 @@ function groupBusySlotsByDate(slots: DashboardBusySlot[]) {
 }
 
 export interface PlanDashboardProps {
-  planId: string;
+  planId?: string;
+  initialReviewSessionId?: string | null;
 }
 
 type ViewState = "loading" | "ready" | "error";
 type WeekViewMode = "list" | "calendar";
 
-export function PlanDashboard({ planId }: PlanDashboardProps) {
+export function PlanDashboard({ planId, initialReviewSessionId }: PlanDashboardProps) {
   const [viewState, setViewState] = useState<ViewState>("loading");
   const [plan, setPlan] = useState<DashboardPlan | null>(null);
   const [message, setMessage] = useState("");
-  const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
+  const [reviewSessionId, setReviewSessionId] = useState<string | null>(initialReviewSessionId ?? null);
   const [weekViewMode, setWeekViewMode] = useState<WeekViewMode>("list");
   const [weekOffset, setWeekOffset] = useState(0);
   const [weekOffsetInitialized, setWeekOffsetInitialized] = useState(false);
@@ -83,6 +84,12 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
   const loadPlan = useCallback(async () => {
     setViewState("loading");
     setMessage("");
+
+    if (!planId) {
+      setMessage("未指定计划。");
+      setViewState("error");
+      return;
+    }
 
     try {
       const result = await fetchPlanDashboard(planId);
@@ -98,6 +105,14 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
     void loadPlan();
   }, [loadPlan]);
 
+  useEffect(() => {
+    if (!initialReviewSessionId || !plan) return;
+    const session = plan.sessions.find((s) => s.id === initialReviewSessionId);
+    if (!session || session.hasReview) {
+      setReviewSessionId(null);
+    }
+  }, [plan, initialReviewSessionId]);
+
   const sessions = useMemo(() => plan?.sessions ?? [], [plan]);
   const tasks = useMemo(() => plan?.tasks ?? [], [plan]);
   const busySlots = useMemo(() => plan?.busySlots ?? [], [plan]);
@@ -105,7 +120,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
 
   const generation: DashboardGeneration = useMemo(
     () => ({
-      planId,
+      planId: planId ?? "",
       sessions,
       tasks,
       busySlots,
@@ -236,6 +251,7 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
   }
 
   async function handleSyncCalendar() {
+    if (!planId) return;
     setSyncing(true);
     setMessage("");
     try {
@@ -282,6 +298,15 @@ export function PlanDashboard({ planId }: PlanDashboardProps) {
         >
           重试
         </button>
+      </div>
+    );
+  }
+
+  if (!planId) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
+        <AlertCircle className="h-8 w-8 text-red-600" />
+        <p className="text-sm text-red-700">未指定计划。</p>
       </div>
     );
   }

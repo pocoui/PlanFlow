@@ -18,6 +18,7 @@ interface PlanSummary {
 function DashboardContent() {
   const searchParams = useSearchParams();
   const planIdFromUrl = searchParams.get("planId");
+  const reviewSessionIdFromUrl = searchParams.get("reviewSessionId");
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(!planIdFromUrl);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(
@@ -147,7 +148,10 @@ function DashboardContent() {
             ))}
           </div>
         ) : null}
-        <PlanDashboard planId={activePlanId} />
+        <PlanDashboard
+          planId={activePlanId}
+          initialReviewSessionId={reviewSessionIdFromUrl}
+        />
       </div>
 
       {/* 删除确认弹框 */}
