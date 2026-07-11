@@ -1,3 +1,5 @@
+import { csrfFetch } from "./csrf-fetch";
+
 export interface DashboardTask {
   id: string;
   title: string;
@@ -58,7 +60,7 @@ export interface SessionReviewPayload {
 }
 
 export type DashboardFetcher = (
-  url: string,
+  url: string | URL,
   init?: RequestInit
 ) => Promise<Response>;
 
@@ -116,14 +118,14 @@ export function groupSessionsByDate(sessions: DashboardSession[]) {
 
 export async function markTaskCompleted(
   taskId: string,
-  fetcher: DashboardFetcher = fetch
+  fetcher: DashboardFetcher = csrfFetch
 ): Promise<{ id: string; status: string }> {
   return patchStatus(`/api/tasks/${taskId}/status`, "completed", fetcher);
 }
 
 export async function markSessionCompleted(
   sessionId: string,
-  fetcher: DashboardFetcher = fetch
+  fetcher: DashboardFetcher = csrfFetch
 ): Promise<{ id: string; status: string }> {
   return patchStatus(`/api/sessions/${sessionId}/status`, "completed", fetcher);
 }
@@ -131,7 +133,7 @@ export async function markSessionCompleted(
 export async function markSessionStatus(
   sessionId: string,
   status: "completed" | "missed",
-  fetcher: DashboardFetcher = fetch
+  fetcher: DashboardFetcher = csrfFetch
 ): Promise<{ id: string; status: string }> {
   return patchStatus(`/api/sessions/${sessionId}/status`, status, fetcher);
 }
@@ -139,7 +141,7 @@ export async function markSessionStatus(
 export async function submitSessionReview(
   sessionId: string,
   payload: SessionReviewPayload,
-  fetcher: DashboardFetcher = fetch
+  fetcher: DashboardFetcher = csrfFetch
 ): Promise<{
   reviewId: string;
   sessionId: string;
@@ -233,7 +235,7 @@ export function isFeishuAuthRequired(error: unknown): error is FeishuAuthRequire
 
 export async function syncToCalendar(
   planId: string,
-  fetcher: DashboardFetcher = fetch
+  fetcher: DashboardFetcher = csrfFetch
 ): Promise<SyncCalendarResult> {
   const response = await fetcher(`/api/plans/${planId}/sync-calendar`, {
     method: "POST"

@@ -4,6 +4,7 @@ import {
   PlanServiceError,
   updateSessionStatus
 } from "@/lib/services/planService";
+import { updateSessionStatusSchema, validateRequestBody } from "@/lib/server/apiSchemas";
 import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
@@ -16,7 +17,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
     const body = await request.json();
-    const session = await updateSessionStatus(sessionId, body.status, { repository: getRepository() });
+
+    // Zod 校验：API 层第一道防线
+    const validation = validateRequestBody(updateSessionStatusSchema, body);
+    if (!validation.success) {
+      return NextResponse.json(await validation.error.json(), { status: 400 });
+    }
+
+    const session = await updateSessionStatus(sessionId, validation.data.status, { repository: getRepository() });
 
     return NextResponse.json(session);
   } catch (error) {

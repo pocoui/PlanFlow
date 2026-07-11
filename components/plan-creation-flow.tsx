@@ -279,7 +279,7 @@ export function PlanCreationFlow() {
                 <ResultList generation={generation} />
                 <a
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primaryForeground transition hover:bg-teal-800"
-                  href={`/dashboard?planId=${generation.planId}`}
+                  href={`/dashboard?planId=${encodeURIComponent(generation.planId)}`}
                 >
                   <ExternalLink className="h-4 w-4" />
                   Open dashboard

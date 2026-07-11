@@ -4,6 +4,7 @@ import {
   PlanServiceError,
   submitSessionReview
 } from "@/lib/services/planService";
+import { submitSessionReviewSchema, validateRequestBody } from "@/lib/server/apiSchemas";
 import { getRepository } from "@/lib/server/repository";
 
 interface RouteContext {
@@ -16,7 +17,14 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
     const body = await request.json();
-    const result = await submitSessionReview(sessionId, body, { repository: getRepository() });
+
+    // Zod 校验：API 层第一道防线
+    const validation = validateRequestBody(submitSessionReviewSchema, body);
+    if (!validation.success) {
+      return NextResponse.json(await validation.error.json(), { status: 400 });
+    }
+
+    const result = await submitSessionReview(sessionId, validation.data, { repository: getRepository() });
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

@@ -41,8 +41,8 @@ describe("planDashboard", () => {
   });
 
   it("marks a task completed through the status API", async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    const fetcher = async (url: string, init?: RequestInit) => {
+    const calls: Array<{ url: string | URL; init?: RequestInit }> = [];
+    const fetcher = async (url: string | URL, init?: RequestInit) => {
       calls.push({ url, init });
       return jsonResponse({ id: "task_1", status: "completed" });
     };
@@ -50,7 +50,7 @@ describe("planDashboard", () => {
     const result = await markTaskCompleted("task_1", fetcher);
 
     expect(result.status).toBe("completed");
-    expect(calls[0].url).toBe("/api/tasks/task_1/status");
+    expect(String(calls[0].url)).toBe("/api/tasks/task_1/status");
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({
       status: "completed"
     });
@@ -66,8 +66,8 @@ describe("planDashboard", () => {
   });
 
   it("submits a session review through the review API", async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    const fetcher = async (url: string, init?: RequestInit) => {
+    const calls: Array<{ url: string | URL; init?: RequestInit }> = [];
+    const fetcher = async (url: string | URL, init?: RequestInit) => {
       calls.push({ url, init });
       return jsonResponse({
         reviewId: "review_1",
@@ -91,7 +91,7 @@ describe("planDashboard", () => {
     );
 
     expect(result.reviewId).toBe("review_1");
-    expect(calls[0].url).toBe("/api/sessions/session_1/review");
+    expect(String(calls[0].url)).toBe("/api/sessions/session_1/review");
   });
 
   it("builds the ICS export URL", () => {

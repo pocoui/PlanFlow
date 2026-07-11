@@ -128,7 +128,7 @@ function SessionRow({
           {session.status === "conflicted" ? (
             <Link
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-              href={`/dashboard?planId=${session.planId}`}
+              href={`/dashboard?planId=${encodeURIComponent(session.planId)}`}
             >
               查看冲突
             </Link>

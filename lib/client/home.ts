@@ -123,7 +123,7 @@ export function aggregateHomeData(
         sessionId: session.id,
         action: {
           kind: "href",
-          payload: `/dashboard?planId=${plan.id}&reviewSessionId=${session.id}`
+          payload: `/dashboard?planId=${encodeURIComponent(plan.id)}&reviewSessionId=${encodeURIComponent(session.id)}`
         }
       });
     }

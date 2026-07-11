@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     });
 
     // 重定向回仪表盘页面（planId 作为查询参数），同时设置 cookie
-    const redirectPath = state ? `/dashboard?planId=${state}` : "/dashboard";
+    const redirectPath = state ? `/dashboard?planId=${encodeURIComponent(state)}` : "/dashboard";
     const redirectUrl = `${origin}${redirectPath}`;
 
     const response = NextResponse.redirect(redirectUrl);
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "授权失败";
     // 授权失败，重定向回仪表盘页面并附带错误信息
-    const redirectPath = state ? `/dashboard?planId=${state}` : "/dashboard";
+    const redirectPath = state ? `/dashboard?planId=${encodeURIComponent(state)}` : "/dashboard";
     return NextResponse.redirect(
       `${origin}${redirectPath}&feishu_auth_error=${encodeURIComponent(message)}`
     );

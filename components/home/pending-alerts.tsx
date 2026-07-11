@@ -93,6 +93,16 @@ export function PendingAlerts({ alerts }: PendingAlertsProps) {
   );
 }
 
+/** 校验 URL 协议，仅允许 https: 和 http:（防御 javascript: 等协议注入） */
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 function AlertAction({
   alert,
   variant
@@ -112,13 +122,17 @@ function AlertAction({
   }
 
   if (alert.action.kind === "authorize" && alert.action.payload) {
+    const handleAuthorize = () => {
+      if (isSafeUrl(alert.action.payload!)) {
+        window.location.href = alert.action.payload!;
+      }
+    };
+
     return (
       <button
         className={className}
         type="button"
-        onClick={() => {
-          window.location.href = alert.action.payload!;
-        }}
+        onClick={handleAuthorize}
       >
         {alert.actionLabel}
         <ExternalLink className="h-3.5 w-3.5" />

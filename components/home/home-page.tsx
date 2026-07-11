@@ -95,7 +95,7 @@ export function HomePage() {
 
   async function handleComplete(sessionId: string, planId: string) {
     await markSessionStatus(sessionId, "completed");
-    router.push(`/dashboard?planId=${planId}&reviewSessionId=${sessionId}`);
+    router.push(`/dashboard?planId=${encodeURIComponent(planId)}&reviewSessionId=${encodeURIComponent(sessionId)}`);
   }
 
   const { exportPlanId, exportDisabled } = useMemo(() => {
