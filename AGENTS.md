@@ -8,7 +8,8 @@ PlanFlow AI 当前是一个 Next.js App Router + TypeScript 全栈项目。第�
 - 计划文档位于 `docs/`。
 - 计划技术栈为 Next.js App Router + React + TypeScript、Route Handlers、Prisma + PostgreSQL、Tailwind CSS + shadcn/ui、Zod、Vitest 和 Playwright。
 - 已创建 `package.json`、基础配置、`app/`、`components/`、`lib/`、`packages/`、`prisma/` 和 `test/`。
-- 当前还没有 Prisma schema、业务 API、AI 规划服务、排程算法或业务 UI。
+- Prisma schema、业务 API、AI 规划服务、排程算法和业务 UI 已实现。
+- 部署目标：Vercel + Supabase (PostgreSQL)。
 
 ## 工作规则
 
@@ -75,6 +76,38 @@ npm run build
 - AI 输出校验
 - API 契约
 - 日历导出
+
+## 部署
+
+目标：Vercel + Supabase (PostgreSQL)
+
+### 环境变量
+
+复制 `.env.example` 为 `.env`，填入实际值。必填项：
+
+| 变量 | 说明 |
+|------|------|
+| `DATABASE_URL` | Supabase PostgreSQL 连接串（使用 Connection Pooling 模式，端口 6543） |
+| `FEISHU_APP_ID` | 飞书开放平台应用 ID |
+| `FEISHU_APP_SECRET` | 飞书开放平台应用 Secret |
+| `CALENDAR_PROVIDER` | `feishu` 或 `mock_feishu` |
+
+可选项：`AI_PROVIDER`、`OPENAI_BASE_URL`、`OPENAI_MODEL`、`OPENAI_API_KEY`
+
+### 部署步骤
+
+1. 在 Supabase 创建项目，获取 `DATABASE_URL`
+2. 本地执行 `npx prisma db push` 推送 schema 到远程数据库
+3. 将 GitHub 仓库导入 Vercel
+4. 在 Vercel 项目设置中配置环境变量
+5. 飞书开放平台更新 OAuth 回调地址为 `https://<vercel-domain>/api/auth/feishu/callback`
+6. 推送代码触发自动部署
+
+### 注意事项
+
+- `vercel.json` 已配置 `buildCommand` 包含 `npx prisma generate`
+- 未配置 `DATABASE_URL` 时自动回退到内存存储（仅开发用，重启丢数据）
+- Cookie 在 `NODE_ENV=production` 时自动启用 `secure` 标志
 
 ## 后续更新说明
 
