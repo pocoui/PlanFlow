@@ -1,6 +1,8 @@
 import type { WeeklyAvailabilityRuleInput } from "@planflow/shared";
 import { validateWeeklyAvailability } from "@planflow/shared";
 
+import { csrfFetch } from "@/lib/client/csrf-fetch";
+
 import type { DailyAvailability, PlanInfo } from "./wizard-types";
 import { DEFAULT_BUFFER_MINUTES } from "./wizard-types";
 
@@ -133,7 +135,7 @@ export function buildCreatePlanPayload(
 }
 
 export async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const response = await fetch(url, {
+  const response = await csrfFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body)

@@ -2,6 +2,7 @@ import { validateWeeklyAvailability } from "@planflow/shared";
 import type { WeeklyAvailabilityRuleInput } from "@planflow/shared";
 import { getAiConfig } from "./aiConfig";
 import type { AiProviderConfig } from "./aiConfig";
+import { csrfFetch } from "./csrf-fetch";
 
 export interface PlanCreationFormState {
   title: string;
@@ -165,7 +166,7 @@ export function buildCreatePlanPayload(
 
 export async function createAndGeneratePlan(
   form: PlanCreationFormState,
-  fetcher: PlanCreationFetcher = fetch
+  fetcher: PlanCreationFetcher = csrfFetch
 ): Promise<PlanCreationResult> {
   const payload = buildCreatePlanPayload(form);
 
@@ -192,7 +193,7 @@ export async function createAndGeneratePlan(
 
 export async function generatePlanTasks(
   planId: string,
-  fetcher: PlanCreationFetcher = fetch
+  fetcher: PlanCreationFetcher = csrfFetch
 ): Promise<GenerateTasksResponse> {
   const aiConfig = getAiConfig();
   const configError = checkAiConfigValid(aiConfig);
@@ -209,7 +210,7 @@ export async function generatePlanTasks(
 
 export async function schedulePlan(
   planId: string,
-  fetcher: PlanCreationFetcher = fetch
+  fetcher: PlanCreationFetcher = csrfFetch
 ): Promise<GeneratePlanResponse> {
   return postJson<GeneratePlanResponse>(
     `/api/plans/${planId}/schedule`,

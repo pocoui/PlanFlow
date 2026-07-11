@@ -65,9 +65,15 @@ export function PlanWizard() {
   }, [currentStep, state.planInfo, state.availability, state.tasks]);
 
   // 分层引导 · 信息提示：检测是否配置了真实 API（mock 不算已配置）
-  const aiConfigWarning = useMemo(() => {
-    if (isApiConfigured()) return null;
-    return "尚未配置 AI 接口，当前将使用模拟数据生成计划。如需真正的 AI 智能排程，请先配置 OpenAI 兼容接口。";
+  // 必须在 useEffect 中计算，避免 SSR/客户端水合不一致
+  // （isApiConfigured 读 localStorage，服务端始终返回 false）
+  const [aiConfigWarning, setAiConfigWarning] = useState<string | null>(null);
+  useEffect(() => {
+    if (isApiConfigured()) {
+      setAiConfigWarning(null);
+    } else {
+      setAiConfigWarning("尚未配置 AI 接口，当前将使用模拟数据生成计划。如需真正的 AI 智能排程，请先配置 OpenAI 兼容接口。");
+    }
   }, []);
 
   // 水合后将 UTC 日期修正为客户端本地日期

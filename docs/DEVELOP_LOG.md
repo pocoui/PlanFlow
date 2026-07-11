@@ -105,3 +105,61 @@ export function isApiConfigured(): boolean {
 ```
 
 **涉及文件:** `lib/client/aiConfig.ts`、`components/plan-wizard.tsx`、`components/plan-creation-flow.tsx`
+
+---
+
+## 5. CSRF token 校验失败（POST /api/plans 返回 403）
+
+**日期:** 2026-07-11
+
+**现象:** 前端页面创建计划时，`POST /api/plans` 请求返回 `CSRF_TOKEN_MISMATCH` 错误。
+
+**原因:** 存在两个独立的 `postJson` 函数，修复时只改了其中一个：
+1. `lib/client/planCreation.ts` 中的 `postJson` — 已改为使用 `csrfFetch`（第一轮修复）
+2. `components/wizard/wizard-utils.ts` 中的 `postJson` — 仍使用原生 `fetch`（遗漏）
+
+`/plans/new` 页面使用的是 `PlanWizard` 组件，它调用的是 `wizard-utils.ts` 中的 `postJson`，所以第一轮修复未生效。服务端日志确认 `cookieToken` 存在但 `headerToken` 为 `MISSING`。
+
+**解决方案:** 将 `wizard-utils.ts` 的 `postJson` 中的 `fetch` 替换为 `csrfFetch`，确保所有 mutating 请求都自动携带 `X-CSRF-Token` header。
+
+**涉及文件:** `components/wizard/wizard-utils.ts`、`lib/client/planCreation.ts`
+
+**经验:** 当项目中存在多个功能相似的辅助函数（如 `postJson`、`fetcher`）时，修复 bug 需要全局搜索所有调用点。使用 `Grep` 搜索模式名比只看导入更可靠。长期应统一为一个 `postJson` 实现，避免重复导致遗漏。
+
+---
+
+## 6. SSR/客户端水合不一致（Hydration Mismatch）
+
+**日期:** 2026-07-11
+
+**现象:** 访问 `/plans/new` 页面时控制台报 React Hydration 错误：服务端渲染的 `className` 与客户端不一致。具体表现为服务端渲染了 AI 配置警告（amber 样式），客户端渲染的是步骤内容（白色卡片）。
+
+**原因:** `PlanWizard` 组件中用 `useMemo` 计算 `aiConfigWarning`：
+
+```typescript
+// 问题代码
+const aiConfigWarning = useMemo(() => {
+  if (isApiConfigured()) return null;
+  return "尚未配置 AI 接口...";
+}, []);
+```
+
+`isApiConfigured()` 读取 `localStorage`，SSR 时 `typeof window === "undefined"` 始终返回 `false`（渲染警告），客户端水合后读取实际值可能返回 `true`（不渲染警告），DOM 结构不一致。
+
+**解决方案:** 改用 `useState` + `useEffect`，初始值为 `null`（SSR 阶段不渲染警告），水合完成后再根据 `localStorage` 实际值设置：
+
+```typescript
+// 修复后
+const [aiConfigWarning, setAiConfigWarning] = useState<string | null>(null);
+useEffect(() => {
+  if (isApiConfigured()) {
+    setAiConfigWarning(null);
+  } else {
+    setAiConfigWarning("尚未配置 AI 接口...");
+  }
+}, []);
+```
+
+**涉及文件:** `components/plan-wizard.tsx`
+
+**经验:** React SSR 水合要求服务端和客户端首次渲染的 DOM 完全一致。任何依赖浏览器 API（`localStorage`、`window`、`document.cookie`）的计算都不能在 `useMemo` / 组件顶层执行，必须放在 `useEffect` 中延迟到客户端执行。与 Vue3 对比：Vue3 的 SSR 也有同样约束，`onMounted` 之前的逻辑不应访问浏览器 API。
