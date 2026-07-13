@@ -55,6 +55,23 @@ function toErrorResponse(error: unknown) {
     );
   }
 
+  // Prisma 连接错误（P1xxx）返回 503 而非 500，附带可读信息便于排查
+  const prismaCode = (error as { code?: string })?.code;
+  if (typeof prismaCode === "string" && prismaCode.startsWith("P1")) {
+    console.error("[plans] Prisma connection error:", prismaCode, (error as Error).message);
+    return NextResponse.json(
+      {
+        error: {
+          code: "DATABASE_UNAVAILABLE",
+          message: "Database connection failed. Please try again later.",
+          details: { prismaCode }
+        }
+      },
+      { status: 503 }
+    );
+  }
+
+  console.error("[plans] Unexpected error:", error);
   return NextResponse.json(
     {
       error: {
