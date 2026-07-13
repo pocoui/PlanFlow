@@ -8,6 +8,7 @@ import {
   saveAiConfig,
   getApiKeyPreview
 } from "@/lib/client/aiConfig";
+import { csrfFetch } from "@/lib/client/csrf-fetch";
 import type { AiProviderConfig } from "@/lib/client/aiConfig";
 
 // 设置页面——配置 AI Agent API，所有配置存储在 localStorage。
@@ -119,7 +120,7 @@ export default function SettingsPage() {
       saveAiConfig(config);
 
       // 发送测试请求，直接将完整配置传给服务端
-      const response = await fetch("/api/settings/ai/test", {
+      const response = await csrfFetch("/api/settings/ai/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
