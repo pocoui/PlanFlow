@@ -191,6 +191,7 @@ export function HomePage() {
 
         <TodaySessions
           sessions={data.todaySessions}
+          busySlots={data.todayBusySlots}
           onSkip={handleSkip}
           onComplete={handleComplete}
         />

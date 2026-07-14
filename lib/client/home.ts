@@ -6,7 +6,16 @@ export interface HomeData {
   partialFailure?: boolean;
   plans: HomePlanSummary[];
   todaySessions: HomeTodaySession[];
+  todayBusySlots: HomeTodayBusySlot[];
   pendingAlerts: HomeAlert[];
+}
+
+export interface HomeTodayBusySlot {
+  id: string;
+  planId: string;
+  title: string;
+  startAt: string;
+  endAt: string;
 }
 
 export interface HomePlanSummary {
@@ -63,12 +72,14 @@ export function aggregateHomeData(
       partialFailure: options.partialFailure,
       plans: [],
       todaySessions: [],
+      todayBusySlots: [],
       pendingAlerts: []
     };
   }
 
   const summaries: HomePlanSummary[] = [];
   const todaySessions: HomeTodaySession[] = [];
+  const todayBusySlots: HomeTodayBusySlot[] = [];
   const pendingAlerts: HomeAlert[] = [];
 
   for (const plan of generatedPlans) {
@@ -111,6 +122,18 @@ export function aggregateHomeData(
       });
     }
 
+    for (const slot of plan.busySlots) {
+      if (formatLocalDate(slot.startAt) !== todayKey) continue;
+
+      todayBusySlots.push({
+        id: slot.id,
+        planId: plan.id,
+        title: slot.title,
+        startAt: slot.startAt,
+        endAt: slot.endAt
+      });
+    }
+
     for (const session of plan.sessions) {
       if (session.status !== "completed" || session.hasReview) continue;
 
@@ -138,6 +161,7 @@ export function aggregateHomeData(
     partialFailure: options.partialFailure,
     plans: summaries,
     todaySessions,
+    todayBusySlots,
     pendingAlerts
   };
 }
@@ -223,6 +247,7 @@ export async function fetchHomeData(
       fetchedPlans: [],
       plans: [],
       todaySessions: [],
+      todayBusySlots: [],
       pendingAlerts: []
     };
   }

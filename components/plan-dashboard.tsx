@@ -12,7 +12,6 @@ import {
   List,
   Loader2,
   RotateCcw,
-  Sparkles,
   Upload,
   X
 } from "lucide-react";
@@ -368,51 +367,6 @@ export function PlanDashboard({ planId, initialReviewSessionId }: PlanDashboardP
           刷新
         </button>
       </div>
-
-      <section className="overflow-hidden rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-primary/[0.03] to-white">
-        {/* 头部 */}
-        <div className="flex items-center gap-3 border-b border-primary/10 bg-primary/[0.06] px-5 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900">今日日程</h2>
-            <p className="text-xs text-slate-500">
-              {todaySessions.length + todayBusySlots.length === 0
-                ? "今天暂无安排"
-                : `${todaySessions.length} 个学习日程 · ${todayBusySlots.length} 个忙闲时段`}
-            </p>
-          </div>
-        </div>
-
-        {/* 内容 */}
-        <div className="px-5 py-4">
-          {todaySessions.length === 0 && todayBusySlots.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <CalendarClock className="h-6 w-6 text-slate-400" />
-              </div>
-              <p className="text-sm text-slate-500">今天没有日程或忙闲时段</p>
-              <p className="text-xs text-slate-400">去创建计划开始学习吧</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {todaySessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  session={session}
-                  taskTitle={taskTitleById.get(session.taskId) ?? "学习日程"}
-                  onComplete={() => completeSession(session.id)}
-                  onReview={() => setReviewSessionId(session.id)}
-                />
-              ))}
-              {todayBusySlots.map((slot) => (
-                <BusySlotCard key={slot.id} slot={slot} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

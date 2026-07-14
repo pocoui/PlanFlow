@@ -1,60 +1,67 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, Loader2, SkipForward } from "lucide-react";
+import { AlertCircle, CalendarClock, CheckCircle2, Clock, Loader2, SkipForward, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import type { HomeTodaySession } from "@/lib/client/home";
+import type { HomeTodayBusySlot, HomeTodaySession } from "@/lib/client/home";
 import { getTodaySessionStatus } from "@/lib/client/home";
 
 export interface TodaySessionsProps {
   sessions: HomeTodaySession[];
+  busySlots?: HomeTodayBusySlot[];
   onSkip?: (sessionId: string) => Promise<void>;
   onComplete?: (sessionId: string, planId: string) => Promise<void>;
 }
 
-const MAX_DISPLAY = 3;
-
-export function TodaySessions({ sessions, onSkip, onComplete }: TodaySessionsProps) {
+export function TodaySessions({ sessions, busySlots = [], onSkip, onComplete }: TodaySessionsProps) {
   const now = new Date();
-  const displaySessions = sessions.slice(0, MAX_DISPLAY);
-  const remaining = Math.max(0, sessions.length - MAX_DISPLAY);
+  const totalItems = sessions.length + busySlots.length;
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CalendarClock className="h-5 w-5 text-primary" />
-          今日学习
-        </h2>
-        <span className="text-xs text-slate-500">{sessions.length} 个日程</span>
+    <section className="overflow-hidden rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-primary/[0.03] to-white">
+      {/* 头部 */}
+      <div className="flex items-center gap-3 border-b border-primary/10 bg-primary/[0.06] px-5 py-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
+          <Sparkles className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-900">今日日程</h2>
+          <p className="text-xs text-slate-500">
+            {totalItems === 0
+              ? "今天暂无安排"
+              : `${sessions.length} 个学习日程 · ${busySlots.length} 个忙闲时段`}
+          </p>
+        </div>
       </div>
 
-      {sessions.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-          今天没有安排学习任务，好好休息或提前开启明天的学习。
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {displaySessions.map((session) => (
-            <SessionRow
-              key={session.id}
-              session={session}
-              now={now}
-              onSkip={onSkip}
-              onComplete={onComplete}
-            />
-          ))}
-          {remaining > 0 ? (
-            <Link
-              className="text-center text-sm font-medium text-primary hover:underline"
-              href="/dashboard"
-            >
-              还有 {remaining} 个日程
-            </Link>
-          ) : null}
-        </div>
-      )}
+      {/* 内容 */}
+      <div className="px-5 py-4">
+        {sessions.length === 0 && busySlots.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+              <CalendarClock className="h-6 w-6 text-slate-400" />
+            </div>
+            <p className="text-sm text-slate-500">今天没有日程或忙闲时段</p>
+            <p className="text-xs text-slate-400">去创建计划开始学习吧</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {sessions.map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                now={now}
+                onSkip={onSkip}
+                onComplete={onComplete}
+              />
+            ))}
+            {busySlots.map((slot) => (
+              <BusySlotRow key={slot.id} slot={slot} />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -100,16 +107,18 @@ function SessionRow({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] p-3 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-slate-900">{session.taskTitle}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span>
+          <div className="font-semibold text-slate-900">{session.taskTitle}</div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary"
+            >
+              <Clock className="h-3 w-3" />
               {formatTime(session.startAt)} - {formatTime(session.endAt)}
             </span>
-            <span className="text-slate-300">·</span>
-            <span>{session.planTitle}</span>
+            <span className="text-slate-500">{session.planTitle}</span>
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 status === "进行中"
@@ -127,14 +136,14 @@ function SessionRow({
         <div className="flex shrink-0 items-center gap-2">
           {session.status === "conflicted" ? (
             <Link
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
               href={`/dashboard?planId=${encodeURIComponent(session.planId)}`}
             >
               查看冲突
             </Link>
           ) : status === "进行中" ? (
             <button
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
               disabled={loading}
               type="button"
               onClick={handleComplete}
@@ -148,7 +157,7 @@ function SessionRow({
             </button>
           ) : (
             <button
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:border-primary hover:text-primary disabled:opacity-60"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:border-primary hover:text-primary disabled:opacity-60"
               disabled={loading}
               type="button"
               onClick={handleSkip}
@@ -167,6 +176,24 @@ function SessionRow({
       {error ? (
         <p className="text-xs text-red-600">{error}</p>
       ) : null}
+    </div>
+  );
+}
+
+function BusySlotRow({ slot }: { slot: HomeTodayBusySlot }) {
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50/70 p-3">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-red-800">{slot.title}</div>
+          <div className="mt-0.5 text-xs text-red-600">
+            {formatTime(slot.startAt)} - {formatTime(slot.endAt)}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
