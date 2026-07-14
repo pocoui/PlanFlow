@@ -93,6 +93,10 @@ export function HomePage() {
     router.push(`/dashboard?planId=${encodeURIComponent(planId)}&reviewSessionId=${encodeURIComponent(sessionId)}`);
   }
 
+  function handleReview(sessionId: string, planId: string) {
+    router.push(`/dashboard?planId=${encodeURIComponent(planId)}&reviewSessionId=${encodeURIComponent(sessionId)}`);
+  }
+
   const { exportPlanId, exportDisabled } = useMemo(() => {
     if (state.status !== "ready") {
       return { exportPlanId: undefined, exportDisabled: true };
@@ -188,6 +192,7 @@ export function HomePage() {
           sessions={data.todaySessions}
           busySlots={data.todayBusySlots}
           onComplete={handleComplete}
+          onReview={handleReview}
         />
 
         <PendingAlerts alerts={data.pendingAlerts} />

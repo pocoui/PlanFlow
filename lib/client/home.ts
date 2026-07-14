@@ -42,7 +42,7 @@ export interface HomeTodaySession {
   taskTitle: string;
   startAt: string;
   endAt: string;
-  status: "scheduled" | "conflicted";
+  status: "scheduled" | "conflicted" | "completed";
 }
 
 export interface HomeAlert {
@@ -107,7 +107,7 @@ export function aggregateHomeData(
     const todayKey = formatLocalDate(now);
     for (const session of plan.sessions) {
       if (formatLocalDate(session.startAt) !== todayKey) continue;
-      if (session.status !== "scheduled" && session.status !== "conflicted") continue;
+      if (session.status !== "scheduled" && session.status !== "conflicted" && session.status !== "completed") continue;
 
       const task = taskById.get(session.taskId);
       todaySessions.push({
@@ -118,7 +118,7 @@ export function aggregateHomeData(
         taskTitle: task?.title ?? "学习日程",
         startAt: session.startAt,
         endAt: session.endAt,
-        status: session.status as "scheduled" | "conflicted"
+        status: session.status as "scheduled" | "conflicted" | "completed"
       });
     }
 
@@ -171,6 +171,7 @@ export function getTodaySessionStatus(
   now: Date
 ): string {
   if (session.status === "conflicted") return "冲突";
+  if (session.status === "completed") return "已完成";
 
   const startAt = new Date(session.startAt).getTime();
   const endAt = new Date(session.endAt).getTime();

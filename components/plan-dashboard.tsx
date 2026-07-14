@@ -238,7 +238,7 @@ export function PlanDashboard({ planId, initialReviewSessionId }: PlanDashboardP
                 ),
                 ...result.rescheduledSessions
               ],
-              warnings: [...prev.warnings, ...result.warnings]
+              warnings: [...(prev.warnings ?? []), ...result.warnings]
             }
           : prev
       );

@@ -11,9 +11,10 @@ export interface TodaySessionsProps {
   sessions: HomeTodaySession[];
   busySlots?: HomeTodayBusySlot[];
   onComplete?: (sessionId: string, planId: string) => Promise<void>;
+  onReview?: (sessionId: string, planId: string) => void;
 }
 
-export function TodaySessions({ sessions, busySlots = [], onComplete }: TodaySessionsProps) {
+export function TodaySessions({ sessions, busySlots = [], onComplete, onReview }: TodaySessionsProps) {
   const now = new Date();
   const totalItems = sessions.length + busySlots.length;
 
@@ -52,6 +53,7 @@ export function TodaySessions({ sessions, busySlots = [], onComplete }: TodaySes
                 session={session}
                 now={now}
                 onComplete={onComplete}
+                onReview={onReview}
               />
             ))}
             {busySlots.map((slot) => (
@@ -67,11 +69,13 @@ export function TodaySessions({ sessions, busySlots = [], onComplete }: TodaySes
 function SessionRow({
   session,
   now,
-  onComplete
+  onComplete,
+  onReview
 }: {
   session: HomeTodaySession;
   now: Date;
   onComplete?: (sessionId: string, planId: string) => Promise<void>;
+  onReview?: (sessionId: string, planId: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +112,9 @@ function SessionRow({
                   ? "bg-emerald-100 text-emerald-700"
                   : status === "冲突"
                     ? "bg-amber-100 text-amber-700"
-                    : "bg-slate-100 text-slate-600"
+                    : status === "已完成"
+                      ? "bg-teal-100 text-teal-700"
+                      : "bg-slate-100 text-slate-600"
               }`}
             >
               {status}
@@ -124,7 +130,15 @@ function SessionRow({
             >
               查看冲突
             </Link>
-          ) : status === "进行中" ? (
+          ) : session.status === "completed" ? (
+            <button
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary transition hover:bg-primary/20"
+              type="button"
+              onClick={() => onReview?.(session.id, session.planId)}
+            >
+              复盘
+            </button>
+          ) : (
             <button
               className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primaryForeground shadow-sm transition hover:bg-teal-800 disabled:opacity-60"
               disabled={loading}
@@ -136,9 +150,9 @@ function SessionRow({
               ) : (
                 <CheckCircle2 className="h-3.5 w-3.5" />
               )}
-              标记完成
+              完成
             </button>
-          ) : null}
+          )}
         </div>
       </div>
 
