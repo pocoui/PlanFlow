@@ -249,9 +249,10 @@ export function extractExistingSessions(
       const end = new Date(session.endAt);
 
       const pad = (n: number) => String(n).padStart(2, "0");
-      const weekday = start.getDay();
-      const startTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
-      const endTime = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+      // 排程器将用户输入的 "09:00" 直接存为 UTC 09:00，因此用 getUTC 方法还原
+      const weekday = start.getUTCDay();
+      const startTime = `${pad(start.getUTCHours())}:${pad(start.getUTCMinutes())}`;
+      const endTime = `${pad(end.getUTCHours())}:${pad(end.getUTCMinutes())}`;
 
       result.push({ planTitle: plan.title, weekday, startTime, endTime });
     }
