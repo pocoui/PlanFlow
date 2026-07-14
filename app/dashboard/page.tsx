@@ -3,6 +3,8 @@
 import { CalendarDays, Loader2, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
+
+import { csrfFetch } from "@/lib/client/csrf-fetch";
 import { useSearchParams } from "next/navigation";
 
 import { PlanDashboard } from "@/components/plan-dashboard";
@@ -57,7 +59,7 @@ function DashboardContent() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const response = await fetch(`/api/plans/${deleteTarget.id}`, {
+      const response = await csrfFetch(`/api/plans/${deleteTarget.id}`, {
         method: "DELETE"
       });
       if (!response.ok) throw new Error("删除失败");

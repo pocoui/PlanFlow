@@ -189,6 +189,77 @@ export function formatWeekday(value: string): string {
   );
 }
 
+// ── 计划间冲突检测 ──
+
+export interface ExistingSession {
+  planTitle: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ConflictInfo {
+  planTitle: string;
+  timeRange: string;
+}
+
+/** 将 "HH:mm" 转为当天分钟数，方便比较 */
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** 检测某天某个时间段与已有 sessions 是否冲突 */
+export function detectConflicts(
+  weekday: number,
+  rangeStart: string,
+  rangeEnd: string,
+  existingSessions: ExistingSession[]
+): ConflictInfo[] {
+  const rangeStartMin = timeToMinutes(rangeStart);
+  const rangeEndMin = timeToMinutes(rangeEnd);
+
+  return existingSessions
+    .filter((session) => session.weekday === weekday)
+    .filter((session) => {
+      const sStart = timeToMinutes(session.startTime);
+      const sEnd = timeToMinutes(session.endTime);
+      return rangeStartMin < sEnd && sStart < rangeEndMin;
+    })
+    .map((session) => ({
+      planTitle: session.planTitle,
+      timeRange: `${session.startTime}-${session.endTime}`
+    }));
+}
+
+/** 从已有计划的 sessions 中提取按星期几+时间分类的冲突源 */
+export function extractExistingSessions(
+  plans: Array<{
+    title: string;
+    sessions: Array<{ startAt: string; endAt: string; status: string }>;
+  }>
+): ExistingSession[] {
+  const result: ExistingSession[] = [];
+
+  for (const plan of plans) {
+    for (const session of plan.sessions) {
+      if (session.status !== "scheduled" && session.status !== "in_progress") continue;
+
+      const start = new Date(session.startAt);
+      const end = new Date(session.endAt);
+
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const weekday = start.getDay();
+      const startTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+      const endTime = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+      result.push({ planTitle: plan.title, weekday, startTime, endTime });
+    }
+  }
+
+  return result;
+}
+
 export function formatWeekLabel(value: string): string {
   const date = new Date(value);
   const formatter = new Intl.DateTimeFormat("zh-CN", {

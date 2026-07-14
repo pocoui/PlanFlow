@@ -1,16 +1,19 @@
 "use client";
 
-import { X } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 
 import type { DailyAvailability } from "./wizard-types";
 import { Switch } from "./step-plan-info";
+import { detectConflicts, type ExistingSession, type ConflictInfo } from "./wizard-utils";
 
 export function StepAvailability({
   availability,
-  onChange
+  onChange,
+  existingSessions = []
 }: {
   availability: DailyAvailability[];
   onChange: (availability: DailyAvailability[]) => void;
+  existingSessions?: ExistingSession[];
 }) {
   function toggleWeekday(weekday: number) {
     onChange(
@@ -90,53 +93,64 @@ export function StepAvailability({
 
             {day.enabled ? (
               <div className="flex flex-1 flex-col gap-2">
-                {day.ranges.map((range, rangeIndex) => (
-                  <div
-                    key={rangeIndex}
-                    className="flex items-center gap-2"
-                  >
-                    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                      <input
-                        className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
-                        type="time"
-                        value={range.startTime}
-                        onChange={(e) =>
-                          updateRange(day.weekday, rangeIndex, {
-                            startTime: e.target.value
-                          })
-                        }
-                      />
-                      <span className="text-slate-400">-</span>
-                      <input
-                        className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
-                        type="time"
-                        value={range.endTime}
-                        onChange={(e) =>
-                          updateRange(day.weekday, rangeIndex, {
-                            endTime: e.target.value
-                          })
-                        }
-                      />
+                {day.ranges.map((range, rangeIndex) => {
+                  const conflicts = detectConflicts(
+                    day.weekday,
+                    range.startTime,
+                    range.endTime,
+                    existingSessions
+                  );
+
+                  return (
+                    <div key={rangeIndex} className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                          <input
+                            className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
+                            type="time"
+                            value={range.startTime}
+                            onChange={(e) =>
+                              updateRange(day.weekday, rangeIndex, {
+                                startTime: e.target.value
+                              })
+                            }
+                          />
+                          <span className="text-slate-400">-</span>
+                          <input
+                            className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
+                            type="time"
+                            value={range.endTime}
+                            onChange={(e) =>
+                              updateRange(day.weekday, rangeIndex, {
+                                endTime: e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        {rangeIndex === 0 ? (
+                          <button
+                            className="small-action"
+                            type="button"
+                            onClick={() => addRange(day.weekday)}
+                          >
+                            + 添加时间
+                          </button>
+                        ) : (
+                          <button
+                            className="text-slate-400 hover:text-red-600"
+                            type="button"
+                            onClick={() => removeRange(day.weekday, rangeIndex)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {conflicts.length > 0 ? (
+                        <ConflictWarnings conflicts={conflicts} />
+                      ) : null}
                     </div>
-                    {rangeIndex === 0 ? (
-                      <button
-                        className="small-action"
-                        type="button"
-                        onClick={() => addRange(day.weekday)}
-                      >
-                        + 添加时间
-                      </button>
-                    ) : (
-                      <button
-                        className="text-slate-400 hover:text-red-600"
-                        type="button"
-                        onClick={() => removeRange(day.weekday, rangeIndex)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <span className="text-sm text-slate-400">未设置</span>
@@ -145,5 +159,23 @@ export function StepAvailability({
         ))}
       </div>
     </section>
+  );
+}
+
+function ConflictWarnings({ conflicts }: { conflicts: ConflictInfo[] }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {conflicts.map((conflict, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700"
+        >
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>
+            与计划「{conflict.planTitle}」{conflict.timeRange} 冲突
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }

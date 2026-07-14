@@ -10,7 +10,7 @@ import {
   type CreatedPlanResponse,
   type GeneratedTask
 } from "@/lib/client/planCreation";
-import type { DashboardGeneration } from "@/lib/client/planDashboard";
+import { fetchPlanDashboard, type DashboardGeneration } from "@/lib/client/planDashboard";
 import { submitSessionReview } from "@/lib/client/planDashboard";
 
 import { StepCalendarBoard } from "./wizard/step-calendar-board";
@@ -28,7 +28,9 @@ import {
   validatePlanInfo,
   validateAvailabilityState,
   buildCreatePlanPayload,
-  postJson
+  postJson,
+  extractExistingSessions,
+  type ExistingSession
 } from "./wizard/wizard-utils";
 
 // 与 Vue3 对比：
@@ -75,6 +77,41 @@ export function PlanWizard() {
       setAiConfigWarning("尚未配置 AI 接口，当前将使用模拟数据生成计划。如需真正的 AI 智能排程，请先配置 OpenAI 兼容接口。");
     }
   }, []);
+
+  // 已有计划的 sessions，用于冲突检测
+  const [existingSessions, setExistingSessions] = useState<ExistingSession[]>([]);
+
+  // 进入 availability 步骤时拉取已有计划的排程数据
+  useEffect(() => {
+    if (currentStep !== "availability") return;
+
+    let cancelled = false;
+
+    async function fetchExistingSessions() {
+      try {
+        const res = await fetch("/api/plans");
+        if (!res.ok) return;
+        const plans = await res.json() as Array<{ id: string; title: string }>;
+
+        // 并行拉取每个计划的详情（含 sessions）
+        const details = await Promise.all(
+          plans.map((p) => fetchPlanDashboard(p.id).catch(() => null))
+        );
+
+        if (cancelled) return;
+
+        const validPlans = details.filter(
+          (d): d is NonNullable<typeof d> => d !== null
+        );
+        setExistingSessions(extractExistingSessions(validPlans));
+      } catch {
+        // 拉取失败不阻塞用户操作
+      }
+    }
+
+    void fetchExistingSessions();
+    return () => { cancelled = true; };
+  }, [currentStep]);
 
   // 水合后将 UTC 日期修正为客户端本地日期
   useEffect(() => {
@@ -254,6 +291,7 @@ export function PlanWizard() {
             <StepAvailability
               availability={state.availability}
               onChange={setAvailability}
+              existingSessions={existingSessions}
             />
           ) : null}
 
