@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CalendarClock, CheckCircle2, Clock, Loader2, SkipForward, Sparkles } from "lucide-react";
+import { AlertCircle, CalendarClock, CheckCircle2, Clock, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -10,11 +10,10 @@ import { getTodaySessionStatus } from "@/lib/client/home";
 export interface TodaySessionsProps {
   sessions: HomeTodaySession[];
   busySlots?: HomeTodayBusySlot[];
-  onSkip?: (sessionId: string) => Promise<void>;
   onComplete?: (sessionId: string, planId: string) => Promise<void>;
 }
 
-export function TodaySessions({ sessions, busySlots = [], onSkip, onComplete }: TodaySessionsProps) {
+export function TodaySessions({ sessions, busySlots = [], onComplete }: TodaySessionsProps) {
   const now = new Date();
   const totalItems = sessions.length + busySlots.length;
 
@@ -52,7 +51,6 @@ export function TodaySessions({ sessions, busySlots = [], onSkip, onComplete }: 
                 key={session.id}
                 session={session}
                 now={now}
-                onSkip={onSkip}
                 onComplete={onComplete}
               />
             ))}
@@ -69,30 +67,15 @@ export function TodaySessions({ sessions, busySlots = [], onSkip, onComplete }: 
 function SessionRow({
   session,
   now,
-  onSkip,
   onComplete
 }: {
   session: HomeTodaySession;
   now: Date;
-  onSkip?: (sessionId: string) => Promise<void>;
   onComplete?: (sessionId: string, planId: string) => Promise<void>;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const status = getTodaySessionStatus(session, now);
-
-  async function handleSkip() {
-    if (!onSkip || loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await onSkip(session.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "操作失败，请重试");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleComplete() {
     if (!onComplete || loading) return;
@@ -155,21 +138,7 @@ function SessionRow({
               )}
               标记完成
             </button>
-          ) : (
-            <button
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:border-primary hover:text-primary disabled:opacity-60"
-              disabled={loading}
-              type="button"
-              onClick={handleSkip}
-            >
-              {loading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <SkipForward className="h-3.5 w-3.5" />
-              )}
-              跳过
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
 

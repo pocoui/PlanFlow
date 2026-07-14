@@ -88,11 +88,6 @@ export function HomePage() {
     }
   }
 
-  async function handleSkip(sessionId: string) {
-    await markSessionStatus(sessionId, "missed");
-    await load();
-  }
-
   async function handleComplete(sessionId: string, planId: string) {
     await markSessionStatus(sessionId, "completed");
     router.push(`/dashboard?planId=${encodeURIComponent(planId)}&reviewSessionId=${encodeURIComponent(sessionId)}`);
@@ -192,7 +187,6 @@ export function HomePage() {
         <TodaySessions
           sessions={data.todaySessions}
           busySlots={data.todayBusySlots}
-          onSkip={handleSkip}
           onComplete={handleComplete}
         />
 
