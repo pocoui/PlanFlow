@@ -89,49 +89,54 @@ export function StepAvailability({
             </div>
 
             {day.enabled ? (
-              <div className="flex flex-1 flex-wrap items-center gap-2">
+              <div className="flex flex-1 flex-col gap-2">
                 {day.ranges.map((range, rangeIndex) => (
                   <div
                     key={rangeIndex}
-                    className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1"
+                    className="flex items-center gap-2"
                   >
-                    <input
-                      className="w-20 rounded border border-slate-200 px-1 py-0.5 text-sm"
-                      type="time"
-                      value={range.startTime}
-                      onChange={(e) =>
-                        updateRange(day.weekday, rangeIndex, {
-                          startTime: e.target.value
-                        })
-                      }
-                    />
-                    <span className="text-slate-400">-</span>
-                    <input
-                      className="w-20 rounded border border-slate-200 px-1 py-0.5 text-sm"
-                      type="time"
-                      value={range.endTime}
-                      onChange={(e) =>
-                        updateRange(day.weekday, rangeIndex, {
-                          endTime: e.target.value
-                        })
-                      }
-                    />
-                    <button
-                      className="text-slate-400 hover:text-red-600"
-                      type="button"
-                      onClick={() => removeRange(day.weekday, rangeIndex)}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                      <input
+                        className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
+                        type="time"
+                        value={range.startTime}
+                        onChange={(e) =>
+                          updateRange(day.weekday, rangeIndex, {
+                            startTime: e.target.value
+                          })
+                        }
+                      />
+                      <span className="text-slate-400">-</span>
+                      <input
+                        className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
+                        type="time"
+                        value={range.endTime}
+                        onChange={(e) =>
+                          updateRange(day.weekday, rangeIndex, {
+                            endTime: e.target.value
+                          })
+                        }
+                      />
+                    </div>
+                    {rangeIndex === 0 ? (
+                      <button
+                        className="small-action"
+                        type="button"
+                        onClick={() => addRange(day.weekday)}
+                      >
+                        + 添加时间
+                      </button>
+                    ) : (
+                      <button
+                        className="text-slate-400 hover:text-red-600"
+                        type="button"
+                        onClick={() => removeRange(day.weekday, rangeIndex)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
-                <button
-                  className="small-action"
-                  type="button"
-                  onClick={() => addRange(day.weekday)}
-                >
-                  + 添加时间
-                </button>
               </div>
             ) : (
               <span className="text-sm text-slate-400">未设置</span>

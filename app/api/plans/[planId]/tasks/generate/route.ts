@@ -35,7 +35,7 @@ export async function POST(request: Request, context: RouteContext) {
     console.log("[tasks/generate] 成功，生成 tasks:", result.tasks.length, "warnings:", result.warnings.length);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[tasks/generate] 失败:", error instanceof Error ? error.message : error);
+    console.error("[tasks/generate] 失败:", error);
     return toErrorResponse(error);
   }
 }
@@ -54,11 +54,27 @@ function toErrorResponse(error: unknown) {
     );
   }
 
+  // Prisma 连接错误（P1xxx）返回 503
+  if (error instanceof Error && /^P1\d{3}$/.test(error.name)) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "DATABASE_UNAVAILABLE",
+          message: "数据库连接异常，请稍后重试。",
+          details: { prismaCode: error.name }
+        }
+      },
+      { status: 503 }
+    );
+  }
+
+  const message = error instanceof Error ? error.message : "Unexpected server error.";
+
   return NextResponse.json(
     {
       error: {
         code: "INTERNAL_ERROR",
-        message: "Unexpected server error.",
+        message,
         details: {}
       }
     },

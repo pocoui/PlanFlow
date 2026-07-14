@@ -939,7 +939,7 @@ export function createPrismaPlanRepository(): PlanRepository {
         });
 
         return { tasks, sessions, busySlots };
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       return {
         planId: input.planId,
@@ -975,7 +975,7 @@ export function createPrismaPlanRepository(): PlanRepository {
         console.log("[PrismaRepo.savePlanTasks] 已写入新 tasks:", tasks.length);
 
         return { tasks };
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       console.log("[PrismaRepo.savePlanTasks] 事务完成，返回 tasks:", result.tasks.length);
       return result.tasks.map(mapPrismaTask);
@@ -1030,7 +1030,7 @@ export function createPrismaPlanRepository(): PlanRepository {
         });
 
         return { sessions, busySlots };
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       return {
         planId: input.planId,
@@ -1128,7 +1128,7 @@ export function createPrismaPlanRepository(): PlanRepository {
         );
 
         return { review, rescheduledSessions };
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       return {
         reviewId: result.review.id,

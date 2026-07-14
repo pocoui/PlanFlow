@@ -245,7 +245,7 @@ export function PlanWizard() {
           </div>
         ) : null}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           {currentStep === "plan-info" ? (
             <StepPlanInfo planInfo={state.planInfo} onChange={setPlanInfo} />
           ) : null}
