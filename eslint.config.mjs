@@ -12,7 +12,12 @@ const eslintConfig = [
       "coverage/**",
       "dist/**",
       "build/**",
-      "next-env.d.ts"
+      "next-env.d.ts",
+      ".worktrees/**",
+      ".claude/**",
+      "forInterview/**",
+      ".ai-coding/**",
+      "test-results/**"
     ]
   },
   ...compat.extends("next/core-web-vitals", "next/typescript")
