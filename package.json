@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "prepare": "husky"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -40,6 +41,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.0.0",
+    "husky": "^9.1.7",
     "postcss": "^8.4.49",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.17",
