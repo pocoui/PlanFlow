@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import {
   PlanServiceError,
   updateSessionStatus
@@ -16,6 +17,9 @@ interface RouteContext {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
     const body = await request.json();
 
     // Zod 校验：API 层第一道防线
@@ -24,7 +28,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(await validation.error.json(), { status: 400 });
     }
 
-    const session = await updateSessionStatus(sessionId, validation.data.status, { repository: getRepository() });
+    const session = await updateSessionStatus(sessionId, validation.data.status, { repository: getRepository(), userId });
 
     return NextResponse.json(session);
   } catch (error) {

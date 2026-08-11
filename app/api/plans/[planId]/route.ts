@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import { deletePlan, getPlan, PlanServiceError } from "@/lib/services/planService";
 import { getRepository } from "@/lib/server/repository";
 
@@ -12,7 +13,10 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    const plan = await getPlan(planId, { repository: getRepository() });
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
+    const plan = await getPlan(planId, { repository: getRepository(), userId });
 
     return NextResponse.json(plan);
   } catch (error) {
@@ -23,7 +27,10 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    await deletePlan(planId, { repository: getRepository() });
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
+    await deletePlan(planId, { repository: getRepository(), userId });
 
     return NextResponse.json({ success: true });
   } catch (error) {

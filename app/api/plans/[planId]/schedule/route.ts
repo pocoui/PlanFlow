@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import { schedulePlan, PlanServiceError } from "@/lib/services/planService";
 import { getRepository } from "@/lib/server/repository";
 
@@ -12,7 +13,10 @@ interface RouteContext {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    const result = await schedulePlan(planId, { repository: getRepository() });
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
+    const result = await schedulePlan(planId, { repository: getRepository(), userId });
 
     return NextResponse.json(result);
   } catch (error) {

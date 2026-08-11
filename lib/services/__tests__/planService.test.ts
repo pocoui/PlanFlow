@@ -6,6 +6,7 @@ import {
   exportPlanCalendarIcs,
   createInMemoryPlanRepository,
   createPlan,
+  deletePlan,
   generatePlan,
   generatePlanTasks,
   schedulePlan,
@@ -17,11 +18,14 @@ import {
   updateTaskStatus
 } from "../planService";
 
+/** 测试用计划归属用户（与 repository.createPlan 的 userId: "u1" 保持一致） */
+const USER_ID = "u1";
+
 describe("planService", () => {
   it("creates a draft plan with valid availability", async () => {
     const repository = createInMemoryPlanRepository();
 
-    const plan = await createPlan(validCreatePlanInput(), { repository });
+    const plan = await createPlan(validCreatePlanInput(), { repository, userId: USER_ID });
 
     expect(plan).toMatchObject({
       title: "学习 React",
@@ -38,7 +42,7 @@ describe("planService", () => {
         validCreatePlanInput({
           deadline: "2026-07-01"
         }),
-        { repository }
+        { repository, userId: USER_ID }
       )
     ).rejects.toMatchObject({
       code: "VALIDATION_ERROR"
@@ -56,7 +60,7 @@ describe("planService", () => {
             { weekday: 1, startTime: "10:30", endTime: "12:00" }
           ]
         }),
-        { repository }
+        { repository, userId: USER_ID }
       )
     ).rejects.toMatchObject({
       code: "VALIDATION_ERROR"
@@ -72,10 +76,10 @@ describe("planService", () => {
         deadline: "2026-07-07",
         availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
       }),
-      { repository }
+      { repository, userId: USER_ID }
     );
 
-    const result = await generatePlan(plan.id, { repository });
+    const result = await generatePlan(plan.id, { repository, userId: USER_ID });
 
     expect(result.planId).toBe(plan.id);
     expect(result.tasks).toHaveLength(9);
@@ -95,15 +99,15 @@ describe("planService", () => {
         deadline: "2026-07-07",
         availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
       }),
-      { repository }
+      { repository, userId: USER_ID }
     );
 
-    const result = await generatePlanTasks(plan.id, { repository });
+    const result = await generatePlanTasks(plan.id, { repository, userId: USER_ID });
 
     expect(result.planId).toBe(plan.id);
     expect(result.tasks).toHaveLength(9);
 
-    const stored = await getPlan(plan.id, { repository });
+    const stored = await getPlan(plan.id, { repository, userId: USER_ID });
     expect(stored.tasks).toHaveLength(9);
     expect(stored.sessions).toHaveLength(0);
     expect(stored.busySlots).toHaveLength(0);
@@ -118,11 +122,11 @@ describe("planService", () => {
         deadline: "2026-07-07",
         availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
       }),
-      { repository }
+      { repository, userId: USER_ID }
     );
-    await generatePlanTasks(plan.id, { repository });
+    await generatePlanTasks(plan.id, { repository, userId: USER_ID });
 
-    const result = await schedulePlan(plan.id, { repository });
+    const result = await schedulePlan(plan.id, { repository, userId: USER_ID });
 
     expect(result.planId).toBe(plan.id);
     expect(result.tasks).toHaveLength(9);
@@ -141,10 +145,10 @@ describe("planService", () => {
         deadline: "2026-07-07",
         availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
       }),
-      { repository }
+      { repository, userId: USER_ID }
     );
 
-    await expect(schedulePlan(plan.id, { repository })).rejects.toMatchObject({
+    await expect(schedulePlan(plan.id, { repository, userId: USER_ID })).rejects.toMatchObject({
       code: "CONFLICT"
     });
   });
@@ -158,11 +162,11 @@ describe("planService", () => {
         deadline: "2026-07-07",
         availability: [{ weekday: 1, startTime: "09:00", endTime: "12:00" }]
       }),
-      { repository }
+      { repository, userId: USER_ID }
     );
-    await generatePlan(plan.id, { repository });
+    await generatePlan(plan.id, { repository, userId: USER_ID });
 
-    const details = await getPlan(plan.id, { repository });
+    const details = await getPlan(plan.id, { repository, userId: USER_ID });
 
     expect(details.id).toBe(plan.id);
     expect(details.availability).toHaveLength(1);
@@ -177,11 +181,12 @@ describe("planService", () => {
     const taskId = plan.tasks[0].id;
     const sessionId = plan.sessions[0].id;
 
-    const task = await updateTaskStatus(taskId, "completed", { repository });
+    const task = await updateTaskStatus(taskId, "completed", { repository, userId: USER_ID });
     const session = await updateSessionStatus(sessionId, "completed", {
-      repository
+      repository,
+      userId: USER_ID
     });
-    const details = await getPlan(plan.id, { repository });
+    const details = await getPlan(plan.id, { repository, userId: USER_ID });
 
     expect(task.status).toBe("completed");
     expect(session.status).toBe("completed");
@@ -194,10 +199,10 @@ describe("planService", () => {
     const plan = await createGeneratedPlan(repository);
 
     await expect(
-      updateTaskStatus(plan.tasks[0].id, "done", { repository })
+      updateTaskStatus(plan.tasks[0].id, "done", { repository, userId: USER_ID })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     await expect(
-      updateSessionStatus(plan.sessions[0].id, "done", { repository })
+      updateSessionStatus(plan.sessions[0].id, "done", { repository, userId: USER_ID })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
@@ -215,9 +220,9 @@ describe("planService", () => {
         reason: "Interrupted by a meeting",
         continueTask: true
       },
-      { repository }
+      { repository, userId: USER_ID }
     );
-    const details = await getPlan(plan.id, { repository });
+    const details = await getPlan(plan.id, { repository, userId: USER_ID });
 
     expect(result.sessionId).toBe(session.id);
     expect(result.taskId).toBe(session.taskId);
@@ -242,8 +247,8 @@ describe("planService", () => {
     const plan = await createGeneratedPlan(repository);
     const session = plan.sessions[0];
 
-    await updateSessionStatus(session.id, "completed", { repository });
-    const details = await getPlan(plan.id, { repository });
+    await updateSessionStatus(session.id, "completed", { repository, userId: USER_ID });
+    const details = await getPlan(plan.id, { repository, userId: USER_ID });
     const updated = details.sessions.find((item) => item.id === session.id);
 
     expect(updated).toBeDefined();
@@ -255,7 +260,7 @@ describe("planService", () => {
     const plan = await createGeneratedPlan(repository);
     const session = plan.sessions[0];
 
-    await updateSessionStatus(session.id, "completed", { repository });
+    await updateSessionStatus(session.id, "completed", { repository, userId: USER_ID });
     await submitSessionReview(
       session.id,
       {
@@ -265,9 +270,9 @@ describe("planService", () => {
         reason: "",
         continueTask: false
       },
-      { repository }
+      { repository, userId: USER_ID }
     );
-    const details = await getPlan(plan.id, { repository });
+    const details = await getPlan(plan.id, { repository, userId: USER_ID });
     const updated = details.sessions.find((item) => item.id === session.id);
 
     expect(updated).toBeDefined();
@@ -281,7 +286,7 @@ describe("planService", () => {
         startDate: "2026-07-06",
         deadline: "2026-07-09"
       }),
-      { repository }
+      { repository, userId: USER_ID }
     );
 
     const result = await getBusySlotsForPlan(
@@ -290,7 +295,7 @@ describe("planService", () => {
         start: "2026-07-06",
         end: "2026-07-09"
       },
-      { repository }
+      { repository, userId: USER_ID }
     );
 
     expect(result.provider).toBe("mock_feishu");
@@ -302,7 +307,7 @@ describe("planService", () => {
     const repository = createInMemoryPlanRepository();
     const plan = await createGeneratedPlan(repository);
 
-    const ics = await exportPlanCalendarIcs(plan.id, { repository });
+    const ics = await exportPlanCalendarIcs(plan.id, { repository, userId: USER_ID });
 
     expect(ics).toContain("BEGIN:VCALENDAR");
     expect(ics).toContain("BEGIN:VEVENT");
@@ -312,11 +317,28 @@ describe("planService", () => {
 
   it("rejects ICS export when a plan has no scheduled sessions", async () => {
     const repository = createInMemoryPlanRepository();
-    const plan = await createPlan(validCreatePlanInput(), { repository });
+    const plan = await createPlan(validCreatePlanInput(), { repository, userId: USER_ID });
 
-    await expect(exportPlanCalendarIcs(plan.id, { repository })).rejects.toMatchObject({
+    await expect(exportPlanCalendarIcs(plan.id, { repository, userId: USER_ID })).rejects.toMatchObject({
       code: "CONFLICT"
     });
+  });
+
+  it("isolates plans by owner: another user cannot read or delete the plan", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createPlan(validCreatePlanInput(), { repository, userId: USER_ID });
+
+    // 其他用户不可见（返回 NOT_FOUND，不泄露存在性）
+    await expect(getPlan(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+    await expect(deletePlan(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+
+    // 本人可正常访问
+    const details = await getPlan(plan.id, { repository, userId: USER_ID });
+    expect(details.id).toBe(plan.id);
   });
 });
 
@@ -333,11 +355,11 @@ async function createGeneratedPlan(
         { weekday: 3, startTime: "09:00", endTime: "12:00" }
       ]
     }),
-    { repository }
+    { repository, userId: USER_ID }
   );
-  await generatePlan(plan.id, { repository });
+  await generatePlan(plan.id, { repository, userId: USER_ID });
 
-  return getPlan(plan.id, { repository });
+  return getPlan(plan.id, { repository, userId: USER_ID });
 }
 
 function validCreatePlanInput(
@@ -419,7 +441,8 @@ describe("syncSessionsToCalendar", () => {
 
     const result = await syncSessionsToCalendar(plan.id, {
       repository,
-      calendarProvider: mockCalendarProvider as unknown as CalendarProvider
+      calendarProvider: mockCalendarProvider as unknown as CalendarProvider,
+      userId: USER_ID
     });
 
     expect(result.syncedCount).toBe(1);
@@ -490,7 +513,8 @@ describe("syncSessionsToCalendar", () => {
 
     const result = await syncSessionsToCalendar(plan.id, {
       repository,
-      calendarProvider: mockCalendarProvider as unknown as CalendarProvider
+      calendarProvider: mockCalendarProvider as unknown as CalendarProvider,
+      userId: USER_ID
     });
 
     expect(result.syncedCount).toBe(0);
@@ -514,7 +538,7 @@ describe("syncSessionsToCalendar", () => {
       ]
     });
 
-    const result = await syncSessionsToCalendar(plan.id, { repository });
+    const result = await syncSessionsToCalendar(plan.id, { repository, userId: USER_ID });
 
     expect(result.totalSessions).toBe(0);
     expect(result.syncedCount).toBe(0);

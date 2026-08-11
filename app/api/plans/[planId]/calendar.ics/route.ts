@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import {
   exportPlanCalendarIcs,
   PlanServiceError
@@ -15,7 +16,10 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
-    const calendar = await exportPlanCalendarIcs(planId, { repository: getRepository() });
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
+    const calendar = await exportPlanCalendarIcs(planId, { repository: getRepository(), userId });
 
     return new NextResponse(calendar, {
       headers: {

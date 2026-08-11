@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import { createPlan, PlanServiceError } from "@/lib/services/planService";
 import { getRepository } from "@/lib/server/repository";
 
 export async function GET() {
   try {
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
     const repository = getRepository();
-    const plans = await repository.listPlans();
+    const plans = await repository.listPlans(userId);
 
     return NextResponse.json(
       plans.map((plan) => ({
@@ -25,7 +29,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const plan = await createPlan(body, { repository: getRepository() });
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
+    const plan = await createPlan(body, { repository: getRepository(), userId });
 
     return NextResponse.json(
       {

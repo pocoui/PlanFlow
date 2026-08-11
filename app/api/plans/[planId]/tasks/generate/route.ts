@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import { generatePlanTasks, PlanServiceError } from "@/lib/services/planService";
 import { getAiConfigFromEnv } from "@/lib/server/aiConfig";
 import { getRepository } from "@/lib/server/repository";
@@ -13,6 +14,9 @@ interface RouteContext {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
     console.log("[tasks/generate] 收到请求 planId:", planId);
 
     // 优先从请求体读取 AI 配置（前端 localStorage），否则用环境变量兜底
@@ -29,7 +33,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     const result = await generatePlanTasks(planId, {
       repository: getRepository(),
-      aiConfig
+      aiConfig,
+      userId
     });
 
     console.log("[tasks/generate] 成功，生成 tasks:", result.tasks.length, "warnings:", result.warnings.length);

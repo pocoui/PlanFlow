@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import {
   getBusySlotsForPlan,
   PlanServiceError
@@ -15,11 +16,14 @@ interface RouteContext {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
     const { searchParams } = new URL(request.url);
     const result = await getBusySlotsForPlan(planId, {
       start: searchParams.get("start") ?? "",
       end: searchParams.get("end") ?? ""
-    }, { repository: getRepository() });
+    }, { repository: getRepository(), userId });
 
     return NextResponse.json(result);
   } catch (error) {

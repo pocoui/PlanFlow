@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import {
   syncSessionsToCalendar,
   PlanServiceError
@@ -14,6 +15,8 @@ interface RouteContext {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { planId } = await context.params;
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
 
     // 从 cookie 中读取飞书用户 token
     const cookieHeader = request.headers.get("cookie") ?? "";
@@ -40,7 +43,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     const result = await syncSessionsToCalendar(planId, {
       repository: getRepository(),
-      calendarProvider: createCalendarProvider({ userTokenCookie })
+      calendarProvider: createCalendarProvider({ userTokenCookie }),
+      userId
     });
 
     return NextResponse.json({ data: result });

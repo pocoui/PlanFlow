@@ -138,8 +138,12 @@ export interface BusySlotsForPlanResult {
 export interface PlanRepository {
   createPlan(input: CreatePlanRepositoryInput): Promise<PlanRecord>;
   getPlan(planId: string): Promise<PlanRecord | null>;
-  listPlans(): Promise<PlanRecord[]>;
+  listPlans(userId: string): Promise<PlanRecord[]>;
   deletePlan(planId: string): Promise<void>;
+  /** 通过 taskId 解析所属 planId（用于所有权校验） */
+  findPlanIdByTaskId(taskId: string): Promise<string | null>;
+  /** 通过 sessionId 解析所属 planId（用于所有权校验） */
+  findPlanIdBySessionId(sessionId: string): Promise<string | null>;
   savePlanGeneration(input: SavePlanGenerationInput): Promise<GeneratePlanResult>;
   savePlanTasks(input: SavePlanTasksInput): Promise<LearningTaskRecord[]>;
   savePlanSchedule(input: SavePlanScheduleInput): Promise<GeneratePlanResult>;
@@ -157,6 +161,8 @@ export interface PlanRepository {
 }
 
 export interface PlanServiceDependencies {
+  /** 当前登录用户 id，由 API 层从会话注入；决定计划的创建者与可见范围 */
+  userId: string;
   repository?: PlanRepository;
   calendarProvider?: CalendarProvider;
   aiConfig?: {
@@ -218,7 +224,6 @@ interface NormalizedSessionReviewInput extends SessionReviewInput {
   continueTask: boolean;
 }
 
-const MOCK_USER_ID = "mock-user";
 const globalForIdCounter = globalThis as unknown as {
   __planflowIdCounter?: number;
 };
@@ -231,13 +236,13 @@ function persistIdCounter(): void {
 
 export async function createPlan(
   input: CreatePlanInput,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<PlanRecord> {
   const normalized = normalizeCreatePlanInput(input);
   const repository = dependencies.repository ?? createPrismaPlanRepository();
 
   return repository.createPlan({
-    userId: MOCK_USER_ID,
+    userId: dependencies.userId,
     title: normalized.title,
     goal: normalized.goal,
     totalMinutes: normalized.totalMinutes,
@@ -251,7 +256,7 @@ export async function createPlan(
 
 export async function generatePlan(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<GeneratePlanResult> {
   await generatePlanTasks(planId, dependencies);
 
@@ -260,11 +265,11 @@ export async function generatePlan(
 
 export async function generatePlanTasks(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<GeneratePlanTasksResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   console.log("[planService.generatePlanTasks] 查询计划 planId:", planId);
-  const plan = await requirePlan(planId, repository);
+  const plan = await requirePlan(planId, dependencies.userId, repository);
   console.log("[planService.generatePlanTasks] 计划已找到 title:", plan.title, "totalMinutes:", plan.totalMinutes);
 
   const provider = dependencies.aiConfig
@@ -295,12 +300,12 @@ export async function generatePlanTasks(
 
 export async function schedulePlan(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<GeneratePlanResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const calendarProvider =
     dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
-  const plan = await requirePlan(planId, repository);
+  const plan = await requirePlan(planId, dependencies.userId, repository);
 
   if (plan.tasks.length === 0) {
     throw new PlanServiceError(
@@ -340,10 +345,10 @@ export async function schedulePlan(
 
 export async function getPlan(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<PlanDetails> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
-  const plan = await requirePlan(planId, repository);
+  const plan = await requirePlan(planId, dependencies.userId, repository);
 
   return {
     ...plan,
@@ -360,20 +365,22 @@ export async function getPlan(
 
 export async function deletePlan(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<void> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
-  await requirePlan(planId, repository);
+  await requirePlan(planId, dependencies.userId, repository);
   await repository.deletePlan(planId);
 }
 
 export async function updateTaskStatus(
   taskId: string,
   status: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<LearningTaskRecord> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const normalizedStatus = parseTaskStatus(status);
+
+  await requireOwnedPlanByTaskId(taskId, dependencies.userId, repository);
 
   return repository.updateTaskStatus(taskId, normalizedStatus);
 }
@@ -381,10 +388,12 @@ export async function updateTaskStatus(
 export async function updateSessionStatus(
   sessionId: string,
   status: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<ScheduledSessionRecord> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const normalizedStatus = parseSessionStatus(status);
+
+  await requireOwnedPlanBySessionId(sessionId, dependencies.userId, repository);
 
   return repository.updateSessionStatus(sessionId, normalizedStatus);
 }
@@ -392,14 +401,15 @@ export async function updateSessionStatus(
 export async function submitSessionReview(
   sessionId: string,
   input: SessionReviewInput,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<SubmitSessionReviewResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const calendarProvider =
     dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
   const context = await repository.getSessionContext(sessionId);
 
-  if (!context) {
+  // 会话不存在或不属于当前用户 → 统一 NOT_FOUND（不泄露存在性）
+  if (!context || context.plan.userId !== dependencies.userId) {
     throw new PlanServiceError("NOT_FOUND", "Session not found.");
   }
 
@@ -444,12 +454,12 @@ export async function submitSessionReview(
 export async function getBusySlotsForPlan(
   planId: string,
   input: { start: string; end: string },
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<BusySlotsForPlanResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const calendarProvider =
     dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
-  await requirePlan(planId, repository);
+  await requirePlan(planId, dependencies.userId, repository);
   const startAt = parseDate(input.start);
   const endAt = endOfUtcDay(parseDate(input.end));
 
@@ -473,10 +483,10 @@ export async function getBusySlotsForPlan(
 
 export async function exportPlanCalendarIcs(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<string> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
-  const plan = await requirePlan(planId, repository);
+  const plan = await requirePlan(planId, dependencies.userId, repository);
   const exportableSessions = plan.sessions.filter(
     (session) => session.status === "scheduled" || session.status === "completed"
   );
@@ -501,13 +511,13 @@ export interface SyncCalendarResult {
 
 export async function syncSessionsToCalendar(
   planId: string,
-  dependencies: PlanServiceDependencies = {}
+  dependencies: PlanServiceDependencies
 ): Promise<SyncCalendarResult> {
   const repository = dependencies.repository ?? createPrismaPlanRepository();
   const calendarProvider =
     dependencies.calendarProvider ?? new MockFeishuCalendarProvider();
 
-  const plan = await requirePlan(planId, repository);
+  const plan = await requirePlan(planId, dependencies.userId, repository);
   const taskById = new Map(plan.tasks.map((t) => [t.id, t]));
   const scheduledSessions = plan.sessions.filter(
     (s) => s.status === "scheduled"
@@ -599,14 +609,32 @@ export function createInMemoryPlanRepository(): PlanRepository {
 
       return plan ? clonePlan(plan) : null;
     },
-    async listPlans() {
-      return Array.from(plans.values()).map(clonePlan);
+    async listPlans(userId) {
+      return Array.from(plans.values())
+        .filter((plan) => plan.userId === userId)
+        .map(clonePlan);
     },
     async deletePlan(planId) {
       if (!plans.has(planId)) {
         throw new PlanServiceError("NOT_FOUND", "Plan not found.");
       }
       plans.delete(planId);
+    },
+    async findPlanIdByTaskId(taskId) {
+      for (const plan of plans.values()) {
+        if (plan.tasks.some((task) => task.id === taskId)) {
+          return plan.id;
+        }
+      }
+      return null;
+    },
+    async findPlanIdBySessionId(sessionId) {
+      for (const plan of plans.values()) {
+        if (plan.sessions.some((session) => session.id === sessionId)) {
+          return plan.id;
+        }
+      }
+      return null;
     },
     async savePlanGeneration(input) {
       const plan = plans.get(input.planId);
@@ -816,16 +844,8 @@ export function createInMemoryPlanRepository(): PlanRepository {
 export function createPrismaPlanRepository(): PlanRepository {
   return {
     async createPlan(input) {
-      await prisma.user.upsert({
-        where: { id: input.userId },
-        update: {},
-        create: {
-          id: input.userId,
-          email: "mock@planflow.local",
-          name: "Mock User"
-        }
-      });
-
+      // 用户须已存在（注册或管理员种子），learningPlan.userId 外键约束保证归属正确；
+      // 不再为 mock 用户 upsert，避免伪造非真实用户记录
       const plan = await prisma.learningPlan.create({
         data: {
           userId: input.userId,
@@ -857,8 +877,9 @@ export function createPrismaPlanRepository(): PlanRepository {
 
       return plan ? mapPrismaPlan(plan) : null;
     },
-    async listPlans() {
+    async listPlans(userId) {
       const plans = await prisma.learningPlan.findMany({
+        where: { userId },
         include: planInclude,
         orderBy: { createdAt: "desc" }
       });
@@ -872,6 +893,22 @@ export function createPrismaPlanRepository(): PlanRepository {
         throwNotFoundForMissingRecord(error, "Plan not found.");
         throw error;
       }
+    },
+    async findPlanIdByTaskId(taskId) {
+      const task = await prisma.learningTask.findUnique({
+        where: { id: taskId },
+        select: { planId: true }
+      });
+
+      return task?.planId ?? null;
+    },
+    async findPlanIdBySessionId(sessionId) {
+      const session = await prisma.scheduledSession.findUnique({
+        where: { id: sessionId },
+        select: { planId: true }
+      });
+
+      return session?.planId ?? null;
     },
     async savePlanGeneration(input) {
       const result = await prisma.$transaction(async (tx) => {
@@ -1333,15 +1370,43 @@ function normalizeSessionReviewInput(
 
 async function requirePlan(
   planId: string,
+  userId: string,
   repository: PlanRepository
 ): Promise<PlanRecord> {
   const plan = await repository.getPlan(planId);
 
-  if (!plan) {
+  // 计划不存在或不属于该用户 → 统一 NOT_FOUND（不泄露存在性）
+  if (!plan || plan.userId !== userId) {
     throw new PlanServiceError("NOT_FOUND", "Plan not found.");
   }
 
   return plan;
+}
+
+/** 校验 taskId 所属计划归当前用户所有；task 不存在或非本人 → NOT_FOUND */
+async function requireOwnedPlanByTaskId(
+  taskId: string,
+  userId: string,
+  repository: PlanRepository
+): Promise<void> {
+  const planId = await repository.findPlanIdByTaskId(taskId);
+  if (!planId) {
+    throw new PlanServiceError("NOT_FOUND", "Task not found.");
+  }
+  await requirePlan(planId, userId, repository);
+}
+
+/** 校验 sessionId 所属计划归当前用户所有；session 不存在或非本人 → NOT_FOUND */
+async function requireOwnedPlanBySessionId(
+  sessionId: string,
+  userId: string,
+  repository: PlanRepository
+): Promise<void> {
+  const planId = await repository.findPlanIdBySessionId(sessionId);
+  if (!planId) {
+    throw new PlanServiceError("NOT_FOUND", "Session not found.");
+  }
+  await requirePlan(planId, userId, repository);
 }
 
 function endOfUtcDay(date: Date): Date {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequiredUserId, unauthorizedResponse } from "@/lib/auth/session";
 import { PlanServiceError, updateTaskStatus } from "@/lib/services/planService";
 import { updateTaskStatusSchema, validateRequestBody } from "@/lib/server/apiSchemas";
 import { getRepository } from "@/lib/server/repository";
@@ -13,6 +14,9 @@ interface RouteContext {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { taskId } = await context.params;
+    const userId = await getRequiredUserId();
+    if (!userId) return unauthorizedResponse();
+
     const body = await request.json();
 
     // Zod 校验：API 层第一道防线
@@ -21,7 +25,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(await validation.error.json(), { status: 400 });
     }
 
-    const task = await updateTaskStatus(taskId, validation.data.status, { repository: getRepository() });
+    const task = await updateTaskStatus(taskId, validation.data.status, { repository: getRepository(), userId });
 
     return NextResponse.json(task);
   } catch (error) {
