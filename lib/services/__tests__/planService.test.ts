@@ -340,6 +340,56 @@ describe("planService", () => {
     const details = await getPlan(plan.id, { repository, userId: USER_ID });
     expect(details.id).toBe(plan.id);
   });
+
+  it("isolates all cross-user operations: every read/mutating path returns NOT_FOUND", async () => {
+    const repository = createInMemoryPlanRepository();
+    const plan = await createGeneratedPlan(repository);
+    const taskId = plan.tasks[0].id;
+    const sessionId = plan.sessions[0].id;
+
+    // 计划级操作：他人一律 NOT_FOUND（不泄露存在性）
+    await expect(generatePlan(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+    await expect(generatePlanTasks(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+    await expect(schedulePlan(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+    await expect(getBusySlotsForPlan(
+      plan.id,
+      { start: "2026-07-06", end: "2026-07-09" },
+      { repository, userId: "u2" }
+    )).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(exportPlanCalendarIcs(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+    await expect(syncSessionsToCalendar(plan.id, { repository, userId: "u2" })).rejects.toMatchObject({
+      code: "NOT_FOUND"
+    });
+
+    // 任务/会话级操作：经 task/session 反查计划归属，他人一律 NOT_FOUND
+    await expect(
+      updateTaskStatus(taskId, "completed", { repository, userId: "u2" })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      updateSessionStatus(sessionId, "completed", { repository, userId: "u2" })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      submitSessionReview(
+        sessionId,
+        {
+          result: "completed",
+          actualMinutes: plan.sessions[0].durationMinutes,
+          remainingMinutes: 0,
+          reason: "",
+          continueTask: false
+        },
+        { repository, userId: "u2" }
+      )
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
 });
 
 async function createGeneratedPlan(

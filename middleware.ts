@@ -77,10 +77,11 @@ export default auth((req) => {
     return handleCsrf(req) ?? NextResponse.next();
   }
 
-  // 5) 受保护页面：未登录重定向登录页（带回跳地址）
+  // 5) 受保护页面：未登录重定向登录页（带回跳地址，保留原始 query string 以便登录后
+  //    回到带参数的深链接，如 /dashboard?planId=..&reviewSessionId=..）
   if (!isLoggedIn) {
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("redirect", pathname);
+    loginUrl.searchParams.set("redirect", `${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

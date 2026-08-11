@@ -24,7 +24,7 @@
 对齐 `lib/server/repository.ts` 的 Prisma/in-memory 哲学：
 
 - **Prisma 模式**（`DATABASE_URL` 已设置）：查 `User` 表，首次用管理员凭据登录自动 upsert 种子管理员（scrypt 哈希）。注册的用户写入 `User` 表。
-- **内存模式**（无 `DATABASE_URL`，CI/测试/演示）：直接对比 `.env` 管理员凭据，登录用户 id 固定为 `mock-user`。注册用户仅保存在进程内 Map（重启即失，且 dev 模式热重载下会话状态不稳定，**仅建议用于冒烟验证**）。
+- **内存模式**（无 `DATABASE_URL`，CI/测试/演示）：直接对比 `.env` 管理员凭据，登录用户 id 固定为 `admin`（非 `mock-user`）。注册用户仅保存在进程内 Map（重启即失，且 dev 模式热重载下会话状态不稳定，**仅建议用于冒烟验证**）。
 
 > 生产与本地联调请配置 `DATABASE_URL`（Prisma 模式），会话与注册数据持久可靠。
 
