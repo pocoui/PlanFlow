@@ -23,8 +23,17 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 /** CSRF 保护路径前缀（仅保护 API 路由） */
 const PROTECTED_PATH_PREFIX = "/api/";
 
-/** 不需要 CSRF 校验的路径（OAuth 回调等外部重定向入口） */
+/** 不需要 CSRF 校验的路径（Auth.js 内部端点自带 CSRF；OAuth 回调等外部重定向入口） */
 const CSRF_EXCLUDED_PATHS = new Set([
+  // Auth.js 内部端点（自带 CSRF 防护，避免 403 冲突）
+  "/api/auth/session",
+  "/api/auth/csrf",
+  "/api/auth/providers",
+  "/api/auth/signin",
+  "/api/auth/signout",
+  "/api/auth/callback/credentials",
+  "/api/auth/error",
+  // 飞书 OAuth 回调 / 外部重定向入口
   "/api/auth/feishu/callback",
   "/api/auth/feishu/authorize",
   "/api/health",
