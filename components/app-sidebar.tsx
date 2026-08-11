@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
+
+import { LogoutButton } from "./logout-button";
 
 // 左侧导航栏，与原型图保持一致。
 // MVP 阶段「计划」「日历」为主流程，其余入口为占位或后续实现。
@@ -22,6 +25,8 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const user = session?.user;
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-border bg-white">
@@ -59,13 +64,18 @@ export function AppSidebar() {
 
       <div className="border-t border-border p-4">
         <div className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-            U
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+            {(user?.name ?? user?.email ?? "U").slice(0, 1).toUpperCase()}
           </div>
-          <div className="text-sm">
-            <div className="font-medium text-slate-800">用户</div>
-            <div className="text-xs text-slate-500">MVP 用户菜单</div>
+          <div className="min-w-0 flex-1 text-sm">
+            <div className="truncate font-medium text-slate-800">
+              {user?.name ?? "未登录"}
+            </div>
+            <div className="truncate text-xs text-slate-500">
+              {user?.email ?? "—"}
+            </div>
           </div>
+          <LogoutButton />
         </div>
       </div>
     </aside>
