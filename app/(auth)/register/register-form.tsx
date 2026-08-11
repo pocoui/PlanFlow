@@ -1,25 +1,38 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useState } from "react";
+
+import { csrfFetch } from "@/lib/client/csrf-fetch";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+interface ApiErrorBody {
+  error?: { code?: string; message?: string };
+}
+
 /**
  * 注册表单（客户端组件）。
- * Step 4：仅完成表单 UI 与前端校验（邮箱格式、密码 ≥8 位、两次一致），
- * 提交回调校验后占位不发请求——真实提交流程（csrfFetch → 注册 API → 自动登录 → 跳转）
- * 在 Step 5 接线。
+ * 提交流程：前端校验 → csrfFetch POST /api/auth/register（注册 API 保持 CSRF 防护）
+ * → 201 后用同样凭据 signIn 自动登录 → 跳转首页；409 显示「该邮箱已注册」。
  */
 export function RegisterForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
+
+    if (submitting) {
+      return;
+    }
 
     if (!EMAIL_REGEX.test(email.trim())) {
       setError("请输入有效的邮箱地址");
@@ -36,7 +49,53 @@ export function RegisterForm() {
       return;
     }
 
-    // Step 5 接线真实提交流程；当前占位不发请求
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await csrfFetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      if (!res.ok) {
+        let message = "注册失败，请稍后重试";
+        try {
+          const body = (await res.json()) as ApiErrorBody;
+          if (res.status === 409) {
+            message = "该邮箱已注册";
+          } else if (body.error?.message) {
+            message = body.error.message;
+          }
+        } catch {
+          // 响应体非 JSON，用默认提示
+        }
+        setError(message);
+        return;
+      }
+
+      // 注册成功 → 自动登录
+      const result = await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        // 注册已成功但自动登录失败，引导用户手动登录
+        router.push("/login");
+        router.refresh();
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("网络异常，请稍后重试");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -89,9 +148,11 @@ export function RegisterForm() {
       </label>
 
       <button
-        className="flex h-11 w-full items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+        disabled={submitting}
         type="submit"
       >
+        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         注册
       </button>
 

@@ -9,6 +9,21 @@
 import { z } from "zod";
 
 /**
+ * POST /api/auth/register
+ */
+export const registerRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("邮箱格式不正确")
+    .max(254, "邮箱长度超出限制"),
+  password: z
+    .string()
+    .min(8, "密码长度至少 8 位")
+    .max(128, "密码长度超出限制"),
+});
+
+/**
  * PATCH /api/sessions/:sessionId/status
  */
 export const updateSessionStatusSchema = z.object({
